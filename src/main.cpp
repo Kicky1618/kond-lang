@@ -1,5 +1,6 @@
 #include "kond_http.hpp"
 #include "kond_jit.hpp"
+#include "kond_lsp.hpp"
 #include "kond_package.hpp"
 #include "kond_registry.hpp"
 
@@ -31,6 +32,7 @@ static void printUsage() {
               << "       [--lib FILE] [--opt-lib FILE] [--explain-optimizations] [--trace-ownership] [--jit] [--dump-llvm]\n"
               << "  kond serve <file.kd> [--bind ADDRESS] [--port PORT] [--max-body BYTES] [--once]\n"
               << "       [--mode safe|verified|unsafe] [--ifc explicit|strict] [--lib FILE] [--opt-lib FILE]\n"
+              << "  kond lsp                       (run the Kond language server over stdio)\n"
               << "  kond check <file.kd> [--lib FILE] [--opt-lib FILE]\n"
               << "  kond new <directory>        (create a minimal Kond project)\n"
               << "  kond install [directory]    (resolve local path dependencies)\n"
@@ -321,6 +323,7 @@ int main(int argc, char **argv) {
     int argument = 1;
     if (std::string(argv[argument]) == "run" || std::string(argv[argument]) == "check" ||
         std::string(argv[argument]) == "serve" || std::string(argv[argument]) == "new" ||
+        std::string(argv[argument]) == "lsp" ||
         std::string(argv[argument]) == "install" || std::string(argv[argument]) == "add" ||
         std::string(argv[argument]) == "remove" || std::string(argv[argument]) == "list" ||
         std::string(argv[argument]) == "registry" || std::string(argv[argument]) == "publish" ||
@@ -344,6 +347,19 @@ int main(int argc, char **argv) {
             std::cerr << "error: " << error.what() << "\n";
             return 1;
         }
+    }
+
+    if (command == "lsp") {
+        if (argument < argc) {
+            const std::string option = argv[argument];
+            if (option == "--help" || option == "-h") {
+                printUsage();
+                return 0;
+            }
+            std::cerr << "error: kond lsp はオプションを受け取りません\n";
+            return 2;
+        }
+        return runLspServer();
     }
 
     if (command == "registry" || command == "publish" || command == "fetch") {

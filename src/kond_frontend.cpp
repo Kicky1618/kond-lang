@@ -1185,6 +1185,10 @@ ExprPtr parseExpression(std::string source, std::string file) {
     return Parser(std::move(source), std::move(file)).parseStandaloneExpression();
 }
 
+std::vector<Token> tokenize(std::string source, std::string file) {
+    return Lexer(std::move(source), std::move(file)).tokenize();
+}
+
 void mergeLibrary(Program &program, const Program &library) {
     if (!library.topLevel.empty()) {
         fail("E0117", library.topLevel.front()->pos,

@@ -269,6 +269,10 @@ struct Program {
 
 Program parseProgram(std::string source, std::string file);
 ExprPtr parseExpression(std::string source, std::string file);
+// Expose the lexer to editor integrations.  The parser still owns all
+// syntactic interpretation; this is only a lossless token stream with source
+// positions for tooling such as the language server.
+std::vector<Token> tokenize(std::string source, std::string file);
 // Merge an explicitly loaded source library.  Unlike an optimization library,
 // a source library may export conditions and functions, but it never executes
 // top-level statements while being loaded.

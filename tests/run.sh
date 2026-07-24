@@ -293,6 +293,10 @@ printf '%s\n' "$ownership_trace" | grep -q 'ownership: xs: Own -> SharedBorrow'
 printf '%s\n' "$ownership_trace" | grep -q 'ownership: xs: BorrowEnd -> Own'
 printf '%s\n' "$ownership_trace" | grep -q 'ownership: xs: Own -> Moved'
 
+if command -v python3 >/dev/null 2>&1; then
+    python3 "$ROOT/tests/lsp_test.py" "$KOND"
+fi
+
 if "$KOND" run "$ROOT/examples/stale_condition.kd" >/dev/null 2>&1; then
     echo "stale condition was unexpectedly accepted" >&2
     exit 1

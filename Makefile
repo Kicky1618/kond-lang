@@ -9,9 +9,9 @@ endif
 LDFLAGS ?= -flto $(DL_LIBS)
 
 TARGET := kond
-SOURCE := src/main.cpp src/kond_frontend.cpp src/kond_package.cpp src/kond_registry.cpp src/kond_interpreter.cpp src/kond_ffi.cpp src/kond_http.cpp src/kond_jit.cpp
+SOURCE := src/main.cpp src/kond_frontend.cpp src/kond_lsp.cpp src/kond_package.cpp src/kond_registry.cpp src/kond_interpreter.cpp src/kond_ffi.cpp src/kond_http.cpp src/kond_jit.cpp
 HEADERS := src/kond_common.hpp src/kond_frontend.hpp src/kond_value.hpp src/kond_runtime.hpp \
-	src/kond_interpreter_api.hpp src/kond_ffi.hpp src/kond_http.hpp src/kond_jit.hpp src/kond_package.hpp src/kond_registry.hpp
+	src/kond_interpreter_api.hpp src/kond_ffi.hpp src/kond_http.hpp src/kond_jit.hpp src/kond_package.hpp src/kond_registry.hpp src/kond_lsp.hpp
 
 LLVM_CONFIG ?= llvm-config
 LLVM_AVAILABLE := $(shell command -v $(LLVM_CONFIG) >/dev/null 2>&1 && echo 1 || echo 0)

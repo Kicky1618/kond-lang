@@ -1,2 +1,6 @@
 build/
+node_modules/
+.next/
+out/
+*.tsbuildinfo
 kond

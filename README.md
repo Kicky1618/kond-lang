@@ -30,7 +30,32 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
+## ドキュメントサイト
+
+Next.js + React + Turbopack + UnoCSS のサイトを同じリポジトリ内で管理しています。
+
+```sh
+npm install
+npm run dev
+```
+
+トップページは `http://localhost:3000/`、仕様書は `http://localhost:3000/docs` から確認できます。
+本番用の確認は `npm run build && npm run start` です。
+
 `-DKOND_NATIVE_OPTIMIZATIONS=ON` を追加すると `-march=native` を有効にします。
+
+## LSP
+
+Kond の言語サーバーは stdio の JSON-RPC で起動できます。
+
+```sh
+./kond lsp
+```
+
+エディタ側では実行ファイルを `kond lsp` として `.kd` に接続してください。
+`initialize`、ドキュメント同期、構文/所有権診断、補完、ホバー、定義、参照、
+ドキュメントシンボル、ワークスペースシンボルに対応しています。ワークスペースの
+未オープンな `.kd` は `rootUri` から必要に応じて読み込みます。
 
 ## 実行
 

@@ -8,6 +8,7 @@ endif()
 add_executable(kond
     src/main.cpp
     src/kond_frontend.cpp
+    src/kond_lsp.cpp
     src/kond_package.cpp
     src/kond_registry.cpp
     src/kond_interpreter.cpp
@@ -16,6 +17,7 @@ add_executable(kond
     src/kond_http.cpp
     src/kond_common.hpp
     src/kond_frontend.hpp
+    src/kond_lsp.hpp
     src/kond_package.hpp
     src/kond_value.hpp
     src/kond_runtime.hpp

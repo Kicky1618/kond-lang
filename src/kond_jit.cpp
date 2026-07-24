@@ -74,7 +74,11 @@ public:
 
         context_ = std::make_unique<LLVMContext>();
         module_ = std::make_unique<Module>("kond.jit", *context_);
+#if LLVM_VERSION_MAJOR >= 21
         module_->setTargetTriple(jit_->getTargetTriple());
+#else
+        module_->setTargetTriple(jit_->getTargetTriple().str());
+#endif
         module_->setDataLayout(jit_->getDataLayout());
         builder_ = std::make_unique<IRBuilder<>>(*context_);
 
@@ -333,7 +337,11 @@ private:
 
     Value *checkedBinary(Intrinsic::ID intrinsic, Value *left, Value *right,
                          const SourcePos &pos, const std::string &operation) {
+#if LLVM_VERSION_MAJOR >= 20
         Function *checked = Intrinsic::getOrInsertDeclaration(module_.get(), intrinsic, {i64()});
+#else
+        Function *checked = Intrinsic::getDeclaration(module_.get(), intrinsic, {i64()});
+#endif
         Value *pair = builder_->CreateCall(checked, {left, right}, operation + ".checked");
         Value *result = builder_->CreateExtractValue(pair, {0}, operation + ".result");
         Value *overflow = builder_->CreateExtractValue(pair, {1}, operation + ".overflow");
@@ -815,12 +823,21 @@ private:
     void defineRuntimeSymbols() {
         orc::MangleAndInterner mangle(jit_->getExecutionSession(), jit_->getDataLayout());
         orc::SymbolMap symbols;
-        symbols[mangle("kond_jit_print_begin")] = orc::ExecutorSymbolDef::fromPtr(&kond_jit_print_begin);
-        symbols[mangle("kond_jit_print_i64")] = orc::ExecutorSymbolDef::fromPtr(&kond_jit_print_i64);
-        symbols[mangle("kond_jit_print_bool")] = orc::ExecutorSymbolDef::fromPtr(&kond_jit_print_bool);
-        symbols[mangle("kond_jit_print_string")] = orc::ExecutorSymbolDef::fromPtr(&kond_jit_print_string);
-        symbols[mangle("kond_jit_print_end")] = orc::ExecutorSymbolDef::fromPtr(&kond_jit_print_end);
-        symbols[mangle("kond_jit_fail")] = orc::ExecutorSymbolDef::fromPtr(&kond_jit_fail);
+#if LLVM_VERSION_MAJOR >= 20
+        auto makeSymbol = [](auto *fn) {
+            return orc::ExecutorSymbolDef::fromPtr(fn, JITSymbolFlags::Exported);
+        };
+#else
+        auto makeSymbol = [](auto *fn) {
+            return orc::ExecutorSymbolDef(orc::ExecutorAddr::fromPtr(fn), JITSymbolFlags::Exported);
+        };
+#endif
+        symbols[mangle("kond_jit_print_begin")] = makeSymbol(&kond_jit_print_begin);
+        symbols[mangle("kond_jit_print_i64")] = makeSymbol(&kond_jit_print_i64);
+        symbols[mangle("kond_jit_print_bool")] = makeSymbol(&kond_jit_print_bool);
+        symbols[mangle("kond_jit_print_string")] = makeSymbol(&kond_jit_print_string);
+        symbols[mangle("kond_jit_print_end")] = makeSymbol(&kond_jit_print_end);
+        symbols[mangle("kond_jit_fail")] = makeSymbol(&kond_jit_fail);
         if (auto error = jit_->getMainJITDylib().define(orc::absoluteSymbols(std::move(symbols)))) {
             throw std::runtime_error("JIT ランタイムシンボルを登録できません: " + llvmError(std::move(error)));
         }

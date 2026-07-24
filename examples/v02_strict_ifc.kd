@@ -1,0 +1,13 @@
+fn main() {
+    let raw = untrusted("yes")
+    let decision = raw is String
+    let result where self is Int = 0
+
+    if decision {
+        result = 1
+    } else {
+        result = 2
+    }
+
+    print(flow_label(result))
+}

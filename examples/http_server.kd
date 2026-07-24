@@ -1,0 +1,15 @@
+// 標準HTTPサーバーの最小例。
+
+route GET "/inspect" (req) {
+    return json_response({
+        method: req.method,
+        path: req.path,
+        name: req.query.name,
+        token: req.header("x-token"),
+        session: req.cookie("sid")
+    })
+}
+
+route GET "/created" (req) {
+    return http_response(201, {"X-Kond": "std"}, "created")
+}

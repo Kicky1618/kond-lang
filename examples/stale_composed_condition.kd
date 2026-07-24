@@ -1,0 +1,10 @@
+fn main() {
+    let x where self is Int = 1
+    let positive = x > 0
+    let small = x < 10
+    let both = positive and small
+    x = -1
+    if both {
+        print("invalid")
+    }
+}

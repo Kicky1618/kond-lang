@@ -1,0 +1,3 @@
+fn package_greet(name) {
+    return "hello " + name
+}

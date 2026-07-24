@@ -1,0 +1,25 @@
+fn main() {
+    let numbers = std.core.range(0, 6)
+    print(type(numbers))
+    print(std.list.length(numbers))
+    print(std.list.sum(numbers))
+    print(std.list.filter(numbers, x => x > 2))
+    print(std.list.all(numbers, x => x >= 0))
+
+    let words = std.string.split("Kond,proof,library", ",")
+    print(std.string.join(std.list.reverse(words), "|"))
+    print(std.string.replace("safe-safe", "safe", "proof"))
+
+    let record = std.map.put({name: "Ada"}, "score", 42)
+    print(std.map.get(record, "score"))
+    print(std.map.keys(record))
+
+    print(std.url.encode_component("a b"))
+    print(std.html.escape("<Ada>"))
+    print(std.json.stringify(record))
+    let even = std.pred.even(42)
+    check even
+    if std.pred.even(42) {
+        print("predicate-ok")
+    }
+}

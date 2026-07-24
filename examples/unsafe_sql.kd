@@ -1,0 +1,4 @@
+fn main() {
+    let name = untrusted("admin")
+    sql_exec("SELECT * FROM users WHERE name = " + name)
+}

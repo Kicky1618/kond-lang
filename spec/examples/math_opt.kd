@@ -1,0 +1,23 @@
+fn even_roundtrip(x)
+    requires x is Int
+    requires x % 2 == 0
+{
+    // Proof-backed optimizer may rewrite this entire expression to `x`.
+    return (x / 2) * 2
+}
+
+fn nonnegative_abs(x)
+    requires x is Int
+    requires x >= 0
+{
+    // May be rewritten to `x`.
+    return abs(x)
+}
+
+fn aligned_mask(x)
+    requires x is Int
+    requires 0 <= x < 256
+{
+    // May be rewritten to `x`.
+    return x & 255
+}

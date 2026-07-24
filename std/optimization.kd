@@ -1,0 +1,152 @@
+// Proof-checked optimization rules shipped with Kond.
+// Load this file with: kond run program.kd --opt-lib std/optimization.kd
+
+rewrite exact divisible_roundtrip(x, d) when d > 0 and x % d == 0 {
+    from (x / d) * d
+    to x
+}
+
+rewrite exact add_zero(x) when x is Int {
+    from x + 0
+    to x
+}
+
+rewrite exact sub_zero(x) when x is Int {
+    from x - 0
+    to x
+}
+
+rewrite exact mul_one(x) when x is Int {
+    from x * 1
+    to x
+}
+
+rewrite exact div_one(x) when x is Int {
+    from x / 1
+    to x
+}
+
+rewrite exact zero_add(x) when x is Int {
+    from 0 + x
+    to x
+}
+
+rewrite exact one_multiply(x) when x is Int {
+    from 1 * x
+    to x
+}
+
+rewrite exact multiply_zero(x) when x is Int {
+    from x * 0
+    to 0
+}
+
+rewrite exact zero_multiply(x) when x is Int {
+    from 0 * x
+    to 0
+}
+
+rewrite exact modulo_one(x) when x is Int {
+    from x % 1
+    to 0
+}
+
+rewrite exact and_zero(x) when x is Int {
+    from x & 0
+    to 0
+}
+
+rewrite exact zero_and(x) when x is Int {
+    from 0 & x
+    to 0
+}
+
+rewrite exact and_all_ones(x) when x is Int {
+    from x & -1
+    to x
+}
+
+rewrite exact or_zero(x) when x is Int {
+    from x | 0
+    to x
+}
+
+rewrite exact zero_or(x) when x is Int {
+    from 0 | x
+    to x
+}
+
+rewrite exact xor_zero(x) when x is Int {
+    from x ^ 0
+    to x
+}
+
+rewrite exact zero_xor(x) when x is Int {
+    from 0 ^ x
+    to x
+}
+
+rewrite exact or_all_ones(x) when x is Int {
+    from x | -1
+    to -1
+}
+
+rewrite exact all_ones_or(x) when x is Int {
+    from -1 | x
+    to -1
+}
+
+rewrite exact self_and(x) when x is Int {
+    from x & x
+    to x
+}
+
+rewrite exact self_or(x) when x is Int {
+    from x | x
+    to x
+}
+
+rewrite exact zero_divide(x) when x is Int and x != 0 {
+    from 0 / x
+    to 0
+}
+
+rewrite exact zero_modulo(x) when x is Int and x != 0 {
+    from 0 % x
+    to 0
+}
+
+rewrite exact self_subtract(x) when x is Int {
+    from x - x
+    to 0
+}
+
+rewrite exact self_xor(x) when x is Int {
+    from x ^ x
+    to 0
+}
+
+rewrite exact self_divide(x) when x is Int and x != 0 {
+    from x / x
+    to 1
+}
+
+rewrite exact self_modulo(x) when x is Int and x != 0 {
+    from x % x
+    to 0
+}
+
+rewrite exact nonnegative_abs(x) when x is Int and x >= 0 {
+    from abs(x)
+    to x
+}
+
+rewrite exact minimum_self(x) when x is Number {
+    from std.math.min(x, x)
+    to x
+}
+
+rewrite exact maximum_self(x) when x is Number {
+    from std.math.max(x, x)
+    to x
+}

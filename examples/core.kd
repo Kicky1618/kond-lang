@@ -1,0 +1,20 @@
+condition SmallInt(x) =
+    x is Int and 0 <= x < 10
+
+fn main() {
+    let x = 3
+
+    prove x is Int
+    check SmallInt(x)
+
+    let positive = x > 0
+    if positive {
+        print("positive", x + 1)
+    } else {
+        print("not positive")
+    }
+
+    let age where self is Int and 0 <= self < 150 = 16
+    age = 20
+    print(age)
+}

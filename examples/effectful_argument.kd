@@ -1,0 +1,9 @@
+fn echo(value)
+    requires value is String
+{
+    print(value)
+}
+
+fn main() {
+    echo(input())
+}

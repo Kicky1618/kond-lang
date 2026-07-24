@@ -1,0 +1,8 @@
+fn main() {
+    let value where self is Int = 1
+    {
+        let slot = &mut value
+        slot += 1
+    }
+    print(value)
+}

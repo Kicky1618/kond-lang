@@ -1,0 +1,8 @@
+fn main() {
+    let answer = library_quadruple(10)
+    require library_positive(answer)
+    let proof = library_positive(answer)
+    check proof
+    print(answer)
+    print(std.opt.rule_count())
+}

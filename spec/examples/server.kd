@@ -1,0 +1,25 @@
+condition UserInput(u) =
+    u has { name, age } and
+    u.name is String and
+    1 <= len(u.name) <= 32 and
+    u.age is Int and
+    0 <= u.age < 150
+
+fn create_user(user)
+    requires UserInput(user)
+{
+    database.query(
+        sql"INSERT INTO users(name, age) VALUES (${user.name}, ${user.age})"
+    )
+}
+
+route POST "/users" (req) {
+    let body = req.json()
+
+    require UserInput(body)
+
+    // The proof produced by `require` is reused here.
+    create_user(body)
+
+    return html"<p>Created ${body.name}</p>"
+}

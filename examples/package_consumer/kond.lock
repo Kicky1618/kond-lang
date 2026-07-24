@@ -1,0 +1,7 @@
+{
+  "lockfileVersion": 1,
+  "root": {"name": "package-consumer", "version": "0.1.0"},
+  "packages": {
+    "greeting": {"version": "0.1.0", "path": "../package_library"}
+  }
+}

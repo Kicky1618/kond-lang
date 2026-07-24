@@ -1,0 +1,3 @@
+fn main() {
+    html_emit(untrusted("<script>"))
+}

@@ -1,0 +1,26 @@
+condition Person(p) =
+    p has {
+        name: String,
+        age: Int where self >= 0 and self < 150
+    }
+
+fn concat(a, b)
+    flow result <- a, b
+{
+    return a + b
+}
+
+fn main() {
+    let raw = untrusted("<b>Ada</b>")
+    let positive = 1 > 0
+    print(positive)
+
+    let person = { name: "Ada", age: 37 }
+    check Person(person)
+
+    let joined = concat(raw, "!")
+    print(flow_label(joined))
+
+    html_emit(html"<p>${raw}</p>")
+    sql_exec(sql"SELECT * FROM users WHERE name = ${raw}")
+}

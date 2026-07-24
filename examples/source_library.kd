@@ -1,0 +1,10 @@
+// Explicitly loaded source libraries export conditions and functions.
+condition library_positive(value) = value is Int and value > 0
+
+fn library_double(value) {
+    return value * 2
+}
+
+fn library_quadruple(value) {
+    return library_double(library_double(value))
+}

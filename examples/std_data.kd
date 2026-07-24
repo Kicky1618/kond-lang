@@ -1,0 +1,9 @@
+fn main() {
+    let document = std.json.parse("{\"count\": 3, \"name\": \"Ada\"}")
+    print(std.map.get(document, "count"))
+    print(std.url.parse_query("q=a%20b&n=2"))
+    print(std.math.gcd(18, 24))
+    print(std.math.lcm(6, 8))
+    print(std.string.parse_int("ff", 16))
+    print(std.core.type_of(std.pred.even(2)))
+}

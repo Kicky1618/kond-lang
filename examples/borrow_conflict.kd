@@ -1,0 +1,7 @@
+fn main() {
+    let xs where self is List = [1]
+    let view = &xs
+    update xs {
+        self.push(2)
+    }
+}

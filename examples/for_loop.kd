@@ -1,0 +1,13 @@
+fn main() {
+    let total where self is Int and self >= 0 = 0
+    for item in std.core.range(1, 6) {
+        total += item
+    }
+    print(total)
+
+    let values where self is List = [1, 2, 3]
+    for item in values {
+        values.push(item)
+    }
+    print(values)
+}

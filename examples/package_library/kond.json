@@ -1,0 +1,7 @@
+{
+  "name": "greeting",
+  "version": "0.1.0",
+  "entry": "lib.kd",
+  "library": "lib.kd",
+  "dependencies": {}
+}

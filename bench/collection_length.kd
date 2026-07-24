@@ -1,0 +1,7 @@
+// These three queries are intentionally large.  ExactEq computes the lengths
+// without materializing the million-element/intermediate results.
+fn main() {
+    print(std.list.length(std.core.range(0, 1000000)))
+    print(std.list.length(std.core.repeat(0, 1000000)))
+    print(std.string.length(std.string.repeat("kond", 1000000)))
+}

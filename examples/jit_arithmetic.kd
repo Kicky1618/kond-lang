@@ -1,0 +1,23 @@
+fn sum_to(limit)
+    requires limit is Int
+    requires limit >= 0
+{
+    let total where self is Int and self >= 0 = 0
+    let i where self is Int and self >= 0 = 1
+    while i <= limit {
+        total += i
+        i += 1
+    }
+    return total
+}
+
+fn main() {
+    print("sum", sum_to(10))
+    let value where self is Int and 0 <= self <= 20 = 3
+    if value > 0 {
+        value += 4
+    } else {
+        value = 0
+    }
+    print(value, abs(-9))
+}

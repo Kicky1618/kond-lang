@@ -1,0 +1,26 @@
+fn even_roundtrip(x)
+    requires x is Int
+    requires x % 2 == 0
+{
+    return (x / 2) * 2
+}
+
+fn nonnegative_abs(x)
+    requires x is Int
+    requires x >= 0
+{
+    return abs(x)
+}
+
+fn aligned_mask(x)
+    requires x is Int
+    requires 0 <= x < 256
+{
+    return x & 255
+}
+
+fn main() {
+    print(even_roundtrip(42))
+    print(nonnegative_abs(9))
+    print(aligned_mask(173))
+}

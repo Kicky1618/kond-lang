@@ -1,0 +1,10 @@
+fn main() {
+    let raw = input()
+    let result where self is Int = 0
+    if raw == "yes" {
+        result = 1
+    } else {
+        result = 2
+    }
+    prove result == 1
+}

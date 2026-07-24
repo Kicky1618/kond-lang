@@ -1,0 +1,63 @@
+// 注文受付の最小フロー。
+// 入力値を条件で検証し、検証済みの値だけを集計・保存・表示する。
+
+condition LineItem(item) =
+    item has {
+        name: String,
+        price: Int where self > 0,
+        quantity: Int where self > 0
+    }
+
+condition Order(order) =
+    order has {
+        customer: String,
+        items: List
+    } and all(order.items, item => LineItem(item))
+
+fn calculate_total(items)
+    requires items is List
+    ensures result is Int and result >= 0
+{
+    let index where self is Int and 0 <= self = 0
+    let total where self is Int and 0 <= self = 0
+
+    while index < len(items) {
+        let item = items[index]
+        total += item.price * item.quantity
+        index += 1
+    }
+
+    return total
+}
+
+fn main() {
+    // untrusted は外部リクエスト由来の値を表す。この値も Order の
+    // 形状を満たしていれば処理できるが、HTML出力時には自動でエスケープされる。
+    let order where Order(self) = {
+        customer: untrusted("<Ada>"),
+        items: [
+            { name: "Notebook", price: 120, quantity: 2 },
+            { name: "Pen", price: 30, quantity: 1 }
+        ]
+    }
+
+    // 借用中は order を変更できない。スコープを抜けると借用が終了する。
+    {
+        let snapshot = &order
+        print("items:", len(snapshot.items))
+    }
+
+    // 検証済みのリストだけを更新し、更新後に注文全体を再検証する。
+    update order.items {
+        self.push({ name: "Sticker", price: 10, quantity: 3 })
+    }
+    require Order(order)
+
+    let total = calculate_total(order.items)
+    print("customer flow:", flow_label(order.customer))
+
+    // sql テンプレートは補間値をパラメータ化し、html テンプレートは
+    // 補間値を文脈に応じてエスケープする。
+    sql_exec(sql"INSERT INTO orders(customer, total) VALUES (${order.customer}, ${total})")
+    html_emit(html"<h1>Order accepted</h1><p>${order.customer}: ${total}</p>")
+}

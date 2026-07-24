@@ -1,0 +1,11 @@
+{
+  "name": "package-consumer",
+  "version": "0.1.0",
+  "entry": "main.kd",
+  "dependencies": {
+    "greeting": {
+      "path": "../package_library",
+      "version": "0.1.0"
+    }
+  }
+}

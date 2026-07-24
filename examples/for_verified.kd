@@ -1,0 +1,7 @@
+fn main() {
+    let total where self is Int and self >= 0 = 0
+    for item in [1, 2, 3] {
+        total += item
+    }
+    print(total)
+}

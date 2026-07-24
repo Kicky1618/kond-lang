@@ -1,0 +1,9 @@
+fn main() {
+    let i where self is Int and 0 <= self <= 1000000 = 0
+    while i < 1000000
+        invariant i is Int and 0 <= i <= 1000000
+    {
+        i += 1
+    }
+    print(i)
+}

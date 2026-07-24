@@ -1,0 +1,85 @@
+(* Kond Draft 0.2 — provisional syntactic coverage grammar. *)
+
+program          = { top_level_decl } ;
+top_level_decl   = condition_decl | function_decl | route_decl | rewrite_decl | statement ;
+
+condition_decl   = "condition" IDENT "(" [ param_list ] ")" "=" condition_expr ;
+function_decl    = [ "unsafe" ] "fn" IDENT "(" [ param_list ] ")"
+                   { contract_clause | flow_clause } block ;
+route_decl       = "route" HTTP_METHOD STRING "(" [ param_list ] ")" block ;
+rewrite_decl     = "rewrite" rewrite_proof IDENT "(" [ rewrite_params ] ")"
+                   "when" condition_expr "{" "from" expression "to" expression "}" ;
+rewrite_proof    = "exact" | "real" | "approx" | "heuristic" ;
+rewrite_params   = IDENT { "," IDENT } ;
+
+contract_clause  = "requires" condition_expr | "ensures" condition_expr ;
+flow_clause      = "flow" (IDENT | "result") "<-" expression { "," expression } ;
+
+param_list       = param { "," param } ;
+param            = IDENT [ "where" condition_expr ] ;
+block            = "{" { statement } "}" ;
+
+statement        = let_stmt | assignment_stmt | if_stmt | while_stmt | for_stmt | match_stmt
+                 | proof_stmt | update_stmt | return_stmt | unsafe_block
+                 | expression_stmt | block ;
+
+let_stmt         = "let" IDENT [ "where" condition_expr ] "=" expression ;
+assignment_stmt  = place ("=" | "+=" | "-=" | "*=" | "/=") expression ;
+proof_stmt       = ("prove" | "check" | "require" | "assume") condition_expr ;
+if_stmt          = "if" condition_expr block [ "else" (block | if_stmt) ] ;
+while_stmt       = "while" condition_expr { "invariant" condition_expr } block ;
+for_stmt         = "for" IDENT "in" expression block ;
+match_stmt       = "match" expression "{" { "when" condition_expr "=>" (statement | expression) }
+                   [ "else" "=>" (statement | expression) ] "}" ;
+update_stmt      = "update" place block ;
+return_stmt      = "return" [ expression ] ;
+unsafe_block     = "unsafe" block ;
+expression_stmt  = expression ;
+
+condition_expr   = condition_or ;
+condition_or     = condition_and { "or" condition_and } ;
+condition_and    = condition_not { "and" condition_not } ;
+condition_not    = [ "not" ] condition_atom ;
+condition_atom   = "always" | "never" | shape_condition | is_condition
+                 | has_condition | chained_comparison | predicate_call
+                 | "(" condition_expr ")" ;
+
+shape_condition  = expression "has" shape_literal ;
+shape_literal    = "{" [ shape_field { "," shape_field } ] "}" ;
+shape_field      = IDENT [ ":" condition_schema ] ;
+condition_schema = IDENT [ "where" condition_expr ] | "(" condition_expr ")" ;
+is_condition     = expression "is" IDENT ;
+has_condition    = expression "has" expression ;
+predicate_call   = IDENT "(" [ argument_list ] ")" ;
+chained_comparison = expression comparison_op expression { comparison_op expression } ;
+comparison_op    = "==" | "!=" | "<" | "<=" | ">" | ">=" | "in" ;
+
+expression       = lambda_expr ;
+lambda_expr      = [ lambda_params "=>" ] logical_expr ;
+lambda_params    = IDENT | "(" [ param_list ] ")" ;
+logical_expr     = additive_expr { ("and" | "or") additive_expr } ;
+additive_expr    = multiplicative_expr { ("+" | "-" | "|" | "^") multiplicative_expr } ;
+multiplicative_expr = unary_expr { ("*" | "/" | "%" | "&") unary_expr } ;
+unary_expr       = [ "-" | "+" | "not" | "move" | "&" | "&mut" ] postfix_expr ;
+postfix_expr     = primary_expr { call_suffix | field_suffix | index_suffix } ;
+call_suffix      = "(" [ argument_list ] ")" ;
+field_suffix     = "." IDENT ;
+index_suffix     = "[" expression "]" ;
+argument_list    = expression { "," expression } ;
+
+primary_expr     = IDENT | NUMBER | STRING | TAGGED_STRING | list_literal
+                 | object_literal | "(" expression ")" ;
+list_literal     = "[" [ expression { "," expression } ] "]" ;
+object_literal   = "{" [ object_field { "," object_field } ] "}" ;
+object_field     = IDENT ":" expression ;
+place            = IDENT { field_suffix | index_suffix } ;
+
+(* The lexer recognizes tagged interpolated literals such as
+   sql"SELECT ... ${expr}" and html"<div>${expr}</div>" as TAGGED_STRING,
+   with embedded expressions recursively parsed by the parser. *)
+
+HTTP_METHOD      = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" ;
+IDENT            = ? identifier token ? ;
+NUMBER           = ? numeric literal ? ;
+STRING           = ? ordinary string literal ? ;
+TAGGED_STRING    = ? identifier-prefixed interpolated literal ? ;

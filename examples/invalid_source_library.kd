@@ -1,0 +1,2 @@
+// Top-level execution is intentionally rejected for --lib.
+print("library code must not execute while loading")

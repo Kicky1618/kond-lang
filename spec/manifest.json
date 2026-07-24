@@ -1,0 +1,21 @@
+{
+  "name": "Kond",
+  "status": "Draft 0.2",
+  "provisional_name": true,
+  "core_concepts": [
+    "Any universal value domain",
+    "Condition<P> instead of primitive bool",
+    "condition-preserving mutable slots",
+    "linear conditions for ownership and capabilities",
+    "CIR/FIR/PIR proof architecture",
+    "proof-backed security contracts",
+    "proof-backed optimization"
+  ],
+  "reference_surfaces": [
+    "docs/15-standard-library.md",
+    "../std/optimization.kd"
+  ],
+  "entrypoint": "SPEC.ja.md",
+  "alternate_entrypoint": "SPEC.md",
+  "revision_notes": "See CHANGELOG.md"
+}

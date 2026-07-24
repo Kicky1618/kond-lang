@@ -1,0 +1,10 @@
+fn main() {
+    let x = 3
+    let positive = x > 0
+    check positive
+    prove positive
+
+    if positive {
+        print("condition")
+    }
+}

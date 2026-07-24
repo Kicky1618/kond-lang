@@ -1,0 +1,7 @@
+fn main() {
+    let i where self is Int and 0 <= self <= 5 = 0
+    while i < 10 {
+        i += 1
+    }
+    print(i)
+}

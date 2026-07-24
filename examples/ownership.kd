@@ -1,0 +1,18 @@
+condition IntList(xs) =
+    xs is List and all(xs, item => item is Int)
+
+fn demo() {
+    let xs where IntList(self) = [1, 2, 3]
+
+    {
+        let view = &xs
+        print(view)
+    }
+
+    update xs {
+        self.push(4)
+    }
+
+    let ys = move xs
+    print(ys)
+}

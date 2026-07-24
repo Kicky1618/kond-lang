@@ -1,0 +1,12 @@
+fn double(x)
+    requires x is Int
+    ensures result is Int
+{
+    return x * 2
+}
+
+fn main() {
+    let value = 21
+    check value is Int
+    print(double(value))
+}

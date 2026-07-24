@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  basePath: "/kond-lang",
   reactStrictMode: true,
   output: "export",
-  images: { unoptimized: true },
 };
 
 export default nextConfig;

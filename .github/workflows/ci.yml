@@ -102,7 +102,7 @@ jobs:
         run: npm run build
 
       - name: Upload artifact to Pages
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ./out
 

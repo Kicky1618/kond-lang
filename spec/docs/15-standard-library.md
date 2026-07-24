@@ -157,7 +157,8 @@ kond run program.kd --lib math_library.kd
 kond check program.kd --lib math_library.kd
 ```
 
-An explicit source library may contain `fn` and `condition` declarations.
+An explicit source library may contain `fn`, `condition`, and `extern fn`
+declarations.
 Those declarations are merged into the program before validation; library
 top-level statements are never executed. `route` declarations and `rewrite`
 declarations are rejected for `--lib`: routes belong to the selected server

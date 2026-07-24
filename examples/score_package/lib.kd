@@ -1,0 +1,46 @@
+// A small source library for validating and summarizing integer scores.
+
+condition ValidScore(value) =
+    value is Int and 0 <= value <= 100
+
+condition ScoreList(values) =
+    values is List and len(values) > 0 and all(values, value => ValidScore(value))
+
+fn score_grade(value)
+    requires ValidScore(value)
+    ensures result is String
+{
+    if value >= 90 {
+        return "A"
+    }
+    if value >= 80 {
+        return "B"
+    }
+    if value >= 70 {
+        return "C"
+    }
+    if value >= 60 {
+        return "D"
+    }
+    return "F"
+}
+
+fn score_average(values)
+    requires ScoreList(values)
+    ensures result is Int and 0 <= result <= 100
+{
+    return std.list.sum(values) / len(values)
+}
+
+fn score_summary(values)
+    requires ScoreList(values)
+    ensures result is Object
+{
+    let total = std.list.sum(values)
+    let average = score_average(values)
+    return {
+        count: len(values),
+        total: total,
+        average: average
+    }
+}

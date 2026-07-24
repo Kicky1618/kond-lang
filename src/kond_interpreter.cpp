@@ -1,4 +1,5 @@
 #include "kond_interpreter_api.hpp"
+#include "kond_ffi.hpp"
 
 namespace kond {
 
@@ -391,6 +392,7 @@ private:
     std::string file_;
     std::shared_ptr<OwnershipLog> ownershipLog_;
     Environment env_;
+    FfiRuntime ffi_;
     bool strictIfc_ = false;
     bool explainOptimizations_ = false;
     bool traceOwnership_ = false;
@@ -3795,6 +3797,11 @@ private:
             // caller expression here would duplicate effects such as input().
         }
 
+        if (function.foreign && mode_ != Mode::Unsafe && !env_.unsafe()) {
+            fail("E3305", callPos,
+                 "FFI関数 " + function.name + " の呼び出しには unsafe ブロックまたは --mode unsafe が必要です");
+        }
+
         auto functionScope = env_.scoped(function.unsafe || mode_ == Mode::Unsafe);
         for (std::size_t i = 0; i < args.size(); ++i) {
             auto binding = env_.define(function.params[i].name, args[i], function.params[i].invariant,
@@ -3809,12 +3816,16 @@ private:
         }
 
         Value returned = Value::null();
-        bool returnedKnown = true;
-        try {
-            executeBlockBody(function.body);
-        } catch (const ReturnSignal &signal) {
-            returned = signal.value;
-            returnedKnown = signal.known;
+        bool returnedKnown = !function.foreign;
+        if (function.foreign) {
+            returned = ffi_.call(function, args, callPos);
+        } else {
+            try {
+                executeBlockBody(function.body);
+            } catch (const ReturnSignal &signal) {
+                returned = signal.value;
+                returnedKnown = signal.known;
+            }
         }
         {
             auto postconditionScope = env_.scoped(false);

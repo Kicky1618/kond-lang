@@ -1,0 +1,19 @@
+unsafe extern fn ffi_add(left: Int, right: Int) -> Int from "@LIB@" as "kond_ffi_add"
+    requires left >= 0 and right >= 0
+    ensures result >= 0;
+unsafe extern fn ffi_scale(value: Float, factor: Float) -> Float from "@LIB@" as "kond_ffi_scale";
+unsafe extern fn ffi_is_even(value: Int) -> Bool from "@LIB@" as "kond_ffi_is_even";
+unsafe extern fn ffi_greeting(name: String) -> String from "@LIB@" as "kond_ffi_greeting";
+unsafe extern fn ffi_noop(message: String) from "@LIB@" as "kond_ffi_noop";
+extern "@LIB@" fn ffi_add_compact(Int, Int) -> Int as "kond_ffi_add";
+
+fn main() {
+    unsafe {
+        print(ffi_add(2, 3))
+        print(ffi_scale(1.5, 4))
+        print(ffi_is_even(8))
+        print(ffi_greeting("Kond"))
+        ffi_noop("ignored")
+        print(ffi_add_compact(4, 5))
+    }
+}

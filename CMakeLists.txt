@@ -11,6 +11,7 @@ add_executable(kond
     src/kond_package.cpp
     src/kond_registry.cpp
     src/kond_interpreter.cpp
+    src/kond_ffi.cpp
     src/kond_jit.cpp
     src/kond_http.cpp
     src/kond_common.hpp
@@ -19,12 +20,16 @@ add_executable(kond
     src/kond_value.hpp
     src/kond_runtime.hpp
     src/kond_interpreter_api.hpp
+    src/kond_ffi.hpp
     src/kond_jit.hpp
     src/kond_http.hpp
     src/kond_registry.hpp
 )
 target_compile_features(kond PRIVATE cxx_std_17)
 target_compile_options(kond PRIVATE -Wall -Wextra -Wpedantic)
+if(CMAKE_DL_LIBS)
+    target_link_libraries(kond PRIVATE ${CMAKE_DL_LIBS})
+endif()
 
 option(KOND_ENABLE_LLVM_JIT "Build the LLVM ORC JIT backend when LLVM is available" ON)
 set(KOND_HAS_LLVM_JIT OFF)

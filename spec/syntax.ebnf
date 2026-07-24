@@ -1,11 +1,18 @@
 (* Kond Draft 0.2 — provisional syntactic coverage grammar. *)
 
 program          = { top_level_decl } ;
-top_level_decl   = condition_decl | function_decl | route_decl | rewrite_decl | statement ;
+top_level_decl   = condition_decl | function_decl | extern_function_decl | route_decl | rewrite_decl | statement ;
 
 condition_decl   = "condition" IDENT "(" [ param_list ] ")" "=" condition_expr ;
 function_decl    = [ "unsafe" ] "fn" IDENT "(" [ param_list ] ")"
                    { contract_clause | flow_clause } block ;
+extern_function_decl = [ "unsafe" ] "extern" [ STRING ] "fn" IDENT
+                       "(" [ ffi_param_list ] ")" [ ( "->" | ":" ) ffi_type ]
+                       [ "from" STRING ] [ "as" STRING ]
+                       { contract_clause | flow_clause } [ ";" ] ;
+ffi_param_list   = ffi_param { "," ffi_param } ;
+ffi_param        = IDENT ":" ffi_type | ffi_type ;
+ffi_type         = "Void" | "Int" | "Float" | "Bool" | "String" ;
 route_decl       = "route" HTTP_METHOD STRING "(" [ param_list ] ")" block ;
 rewrite_decl     = "rewrite" rewrite_proof IDENT "(" [ rewrite_params ] ")"
                    "when" condition_expr "{" "from" expression "to" expression "}" ;

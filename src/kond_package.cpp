@@ -145,6 +145,24 @@ PackageManifest loadPackageManifest(const fs::path &directory) {
     validateProjectRelativeFile(manifest.entry, "entry");
     if (!manifest.library.empty()) validateProjectRelativeFile(manifest.library, "library");
 
+    const Value *nativeValue = findField(fields, "native");
+    if (nativeValue) {
+        if (nativeValue->kind != ValueKind::Array || !nativeValue->array) {
+            packageError(manifestPath.string() + ".native はJSON arrayである必要があります");
+        }
+        std::set<std::string> nativeNames;
+        for (const Value &item : *nativeValue->array) {
+            if (item.kind != ValueKind::String) {
+                packageError(manifestPath.string() + ".native の各要素はStringである必要があります");
+            }
+            validateProjectRelativeFile(item.string, manifestPath.string() + ".native");
+            if (!nativeNames.insert(item.string).second) {
+                packageError(manifestPath.string() + ".native に重複したファイルがあります: " + item.string);
+            }
+            manifest.nativeFiles.push_back(item.string);
+        }
+    }
+
     const Value *dependencyValue = findField(fields, "dependencies");
     if (!dependencyValue) return manifest;
     const auto dependencies = objectFields(*dependencyValue, manifestPath.string() + ".dependencies");
@@ -285,10 +303,25 @@ fs::path packageLibraryFile(const PackageManifest &manifest) {
     return path;
 }
 
+std::vector<fs::path> packageNativeFiles(const PackageManifest &manifest) {
+    std::vector<fs::path> result;
+    result.reserve(manifest.nativeFiles.size());
+    for (const std::string &nativeFile : manifest.nativeFiles) {
+        const fs::path path = manifest.root / nativeFile;
+        std::error_code error;
+        if (!fs::is_regular_file(path, error)) {
+            packageError("nativeファイルがありません: " + path.string());
+        }
+        result.push_back(path);
+    }
+    return result;
+}
+
 std::vector<fs::path> packageLibraryFiles(const PackageGraph &graph) {
     std::vector<fs::path> result;
     result.reserve(graph.dependencies.size());
     for (const PackageNode &node : graph.dependencies) {
+        (void)packageNativeFiles(node.manifest);
         result.push_back(packageLibraryFile(node.manifest));
     }
     return result;
@@ -301,6 +334,14 @@ void writePackageManifest(const PackageManifest &manifest) {
            << "  \"version\": " << jsonQuoted(manifest.version) << ",\n"
            << "  \"entry\": " << jsonQuoted(manifest.entry);
     if (!manifest.library.empty()) output << ",\n  \"library\": " << jsonQuoted(manifest.library);
+    if (!manifest.nativeFiles.empty()) {
+        output << ",\n  \"native\": [";
+        for (std::size_t i = 0; i < manifest.nativeFiles.size(); ++i) {
+            if (i != 0) output << ", ";
+            output << jsonQuoted(manifest.nativeFiles[i]);
+        }
+        output << "]";
+    }
     output << ",\n  \"dependencies\": {";
     if (!manifest.dependencies.empty()) output << '\n';
     bool first = true;
@@ -343,6 +384,7 @@ void addLocalDependency(const fs::path &projectDirectory, const fs::path &depend
     if (project.root == dependency.root) packageError("プロジェクト自身を依存関係に追加できません");
     if (project.name == dependency.name) packageError("プロジェクト自身と同じ名前の依存関係です: " + dependency.name);
     (void)packageLibraryFile(dependency);
+    (void)packageNativeFiles(dependency);
 
     PackageDependency specification;
     specification.path = relativePackagePath(project.root, dependency.root);

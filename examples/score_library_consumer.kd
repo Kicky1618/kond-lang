@@ -1,0 +1,12 @@
+fn main() {
+    let scores = [95, 82, 67, 41]
+    require ScoreList(scores)
+
+    let summary = score_summary(scores)
+    print(summary.count)
+    print(summary.total)
+    print(summary.average)
+    print(score_grade(95))
+    print(score_grade(67))
+    print(score_grade(41))
+}

@@ -1,0 +1,8 @@
+{
+  "name": "ffi-greeting",
+  "version": "0.1.0",
+  "entry": "lib.kd",
+  "library": "lib.kd",
+  "native": ["native/libkond_package_ffi.so"],
+  "dependencies": {}
+}

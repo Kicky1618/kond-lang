@@ -1,0 +1,5 @@
+unsafe extern fn ffi_add(left: Int, right: Int) -> Int from "@LIB@" as "kond_ffi_add";
+
+fn main() {
+    print(ffi_add(1, 2))
+}

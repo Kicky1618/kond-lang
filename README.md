@@ -51,6 +51,30 @@ cmake --build build
 - `verified`: 必要な静的証明がない場合に拒否
 - `unsafe`: `assume`、`declassify`、`endorse` を許す明示的な信頼境界
 
+### C FFI
+
+POSIX環境では、C ABIの共有ライブラリを `extern fn` で呼び出せます。
+FFIの宣言は `Int` (= `int64_t`)、`Float` (= `double`)、`Bool`
+(= `int64_t` の0/1)、`String` (= `const char *`) と `Void` に限定しています。
+共有ライブラリは実行時に `libffi` と `dlopen` でロードされ、`String` の戻り値は
+Kond側へコピーされます。
+
+```kond
+unsafe extern fn add(left: Int, right: Int) -> Int
+    from "./libmath.so" as "my_add";
+
+fn main() {
+    unsafe {
+        print(add(20, 22))
+    }
+}
+```
+
+外部関数の呼び出しには `unsafe { ... }` または `--mode unsafe` が必要です。
+共有ライブラリ側の関数は `extern "C"` で公開してください。FFIは現在のLLVM
+JITでは未対応のため、インタプリタで実行します。ポインタ、構造体、配列、コールバック、
+所有権付きの外部リソースはまだABIに含めません。
+
 新しい最小プロジェクトは `new` で生成できます。
 
 ```sh
@@ -66,13 +90,15 @@ cd hello
 ## パッケージ管理
 
 `kond.json` はパッケージ名・バージョン・エントリポイント・依存関係を
-記述します。現在の依存関係はローカルパスに対応しています。
+記述します。現在の依存関係はローカルパスに対応しています。FFI用の
+共有ライブラリは、パッケージ相対パスの `native` 配列に列挙します。
 
 ```json
 {
   "name": "app",
   "version": "0.1.0",
   "entry": "main.kd",
+  "native": ["native/libmath.so"],
   "dependencies": {
     "greeting": { "path": "../greeting", "version": "0.1.0" }
   }
@@ -88,15 +114,18 @@ cd hello
 ```
 
 `install` は依存関係を検査して `kond.lock` に解決結果を保存します。
-パッケージの `library` に指定した `.kd` は `fn` と `condition` だけを
+パッケージの `library` に指定した `.kd` は `fn`、`condition`、`extern fn` のみを
 公開するソースライブラリとして、プロジェクトディレクトリを指定した
 `run` / `check` から自動的に読み込まれます。レジストリ経由で取得した
-パッケージも同じソースライブラリ方式で実行されます。バイナリパッケージABIは
-まだ対象外です。
+パッケージも同じソースライブラリ方式で実行されます。`native` に列挙した
+共有ライブラリは registry bundle に含まれ、`fetch` 後も `from "native/..."`
+の相対パスでロードできます。これはOSのC ABIであり、安定した
+Kond独自のバイナリパッケージABIではありません。
 
 ### ローカルレジストリ
 
-組み込みの逐次HTTPレジストリで、Kondのソースパッケージをホストできます。
+組み込みの逐次HTTPレジストリで、KondのソースパッケージとPOSIX C FFI用の
+共有ライブラリをホストできます。
 storageディレクトリはパッケージbundleを永続化するだけのローカルストレージです。
 公開・取得コマンドの既定レジストリは `http://kond.j9.si` です。
 `--registry URL` または `KOND_REGISTRY` 環境変数で変更できます。
@@ -107,6 +136,12 @@ storageディレクトリはパッケージbundleを永続化するだけのロ�
 
 # 依存関係を持たないソースパッケージを公開
 ./kond publish examples/package_library --registry http://127.0.0.1:8787
+./kond publish examples/score_package --registry http://127.0.0.1:8787
+
+# native配列で列挙した共有ライブラリも同梱して公開
+cc -shared -fPIC examples/ffi_package/native/ffi_math.c \
+  -o examples/ffi_package/native/libffi_math.so
+./kond publish examples/ffi_package --registry http://127.0.0.1:8787
 
 # 別プロジェクトへ取得。vendor/へ展開し、kond.json/kond.lockも更新
 ./kond new consumer
@@ -127,8 +162,11 @@ KOND_REGISTRY=http://127.0.0.1:8787 ./kond fetch greeting 0.1.0 --project consum
 `--once` を付けると1リクエストで終了するため、動作確認にも使えます。
 この実装は開発・社内ネットワーク向けのHTTPサーバーで、認証、TLS、署名検証、
 依存パッケージのレジストリ解決は行いません。公開bundleは現在、依存関係なしの
-Kondソースパッケージに限定されます。`kond.j9.si` を公開運用する際は、DNSと
-TLS終端を別途用意してください。現行クライアントのregistry通信はHTTPのみです。
+Kondパッケージに限定されます。native artifact はパッケージ相対パスに限られ、
+registry bundle内ではbase64化した `binary` objectとして転送されます。FFIの
+利用可能ABIはPOSIXの限定C ABIで、対象OS・CPU向けに共有ライブラリをビルドして
+公開する必要があります。`kond.j9.si` を公開運用する際は、DNSとTLS終端を別途
+用意してください。現行クライアントのregistry通信はHTTPのみです。
 
 診断用オプション:
 
@@ -136,6 +174,7 @@ TLS終端を別途用意してください。現行クライアントのregistry
 ./kond run examples/v02_math_opt.kd --explain-optimizations
 ./kond run examples/optimization_library.kd --opt-lib std/optimization.kd --explain-optimizations
 ./kond run examples/source_library_consumer.kd --lib examples/source_library.kd
+./kond run examples/score_library_consumer.kd --lib examples/score_library.kd
 ./kond run examples/ownership.kd --entry demo --trace-ownership
 
 # LLVM ORC JIT（LLVM/llvm-config がある環境で有効）
@@ -166,6 +205,7 @@ TLS終端を別途用意してください。現行クライアントのregistry
 - `std.core`、`std.math`、`std.string`、`std.list`、`std.map`、`std.json`、`std.url`、`std.html`、`std.security`、`std.http`、`std.io`、`std.pred`、`std.opt`
 - `rewrite exact|real|approx|heuristic` と `--opt-lib` によるユーザー最適化ライブラリ
 - `--lib` による明示的なソースライブラリ（`fn` と `condition` のみ）
+- C ABI共有ライブラリを呼び出す `unsafe extern fn` FFI（POSIX + libffi）
 
 `spec/examples/math_opt.kd`、`ownership.kd`、`server.kd` はすべて `kond check` を通過します。所有権違反は一般の条件ソルバへ渡さず、専用チェッカーで決定的に判定します。
 
@@ -200,7 +240,8 @@ PIRの証明クラスを混同せず、現在は以下の `ExactEq` 高速化を
 `fn` と `condition` は本体へ統合されますが、読み込み時にトップレベル文は
 実行されません。`route` と `rewrite` は専用の実行境界を持つため、通常の
 ソースライブラリには置けません。現在は名前空間やバージョン管理を持たない
-明示ロード方式であり、独立パッケージABIではありません。
+明示ロード方式であり、独立パッケージABIではありません。`extern fn` の共有ライブラリは
+実行時に解決されます。
 
 標準ライブラリの一覧と意味論は [`spec/docs/15-standard-library.md`](spec/docs/15-standard-library.md)、
 サンプルは [`examples/std_library.kd`](examples/std_library.kd) を参照してください。
@@ -209,7 +250,7 @@ PIRの証明クラスを混同せず、現在は以下の `ExactEq` 高速化を
 
 ## 現在の境界
 
-これはDraft 0.2の実行可能なコア実装です。完全なCIR/FIR/PIRシリアライズ、汎用SMT連携、ユーザー定義linear protocol automata、完全な部分move解析、DB接続、WASMバックエンド、バイナリパッケージABIは未実装です。`kond registry` は開発用の逐次HTTPサーバーであり、本番向けの認証・TLS・署名検証は別途必要です。`serve` は標準C++とOSのソケットAPIだけで実装した逐次HTTPサーバーで、`route` を実際のHTTP入力境界として実行します。データベース接続は行わず、`database.query` はSQL sink の契約を検査する標準スタブです。
+これはDraft 0.2の実行可能なコア実装です。完全なCIR/FIR/PIRシリアライズ、汎用SMT連携、ユーザー定義linear protocol automata、完全な部分move解析、DB接続、WASMバックエンド、安定したKond独自のバイナリパッケージABIは未実装です。FFIは限定されたC ABIの共有ライブラリ呼び出しまでで、native artifactのregistry公開はPOSIX向けです。`kond registry` は開発用の逐次HTTPサーバーであり、本番向けの認証・TLS・署名検証は別途必要です。`serve` は標準C++とOSのソケットAPIだけで実装した逐次HTTPサーバーで、`route` を実際のHTTP入力境界として実行します。データベース接続は行わず、`database.query` はSQL sink の契約を検査する標準スタブです。
 
 LLVM が検出されたビルドでは `--jit` が整数値サブセットを LLVM IR に lowering し、LLVM ORC の `LLJIT` でネイティブコードとして実行します。対応範囲は Int64 の算術／bitwise 演算、条件、`if`、`while`、関数呼び出し、`print`、`requires`／`ensures`／`where` の実行時ガードです。List、Object、HTTP 値、borrow／move、動的な標準ライブラリ API はインタプリタで実行してください。`--mode verified` の静的証明は JIT backend では未対応なので、JIT では拒否します。`--dump-llvm` で生成 IR を確認できます。
 # kond-lang

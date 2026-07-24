@@ -1,0 +1,2 @@
+unsafe extern fn package_add(left: Int, right: Int) -> Int
+    from "native/libkond_package_ffi.so" as "kond_ffi_add";

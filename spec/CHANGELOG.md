@@ -25,3 +25,6 @@
     source-library loading for project-directory `run` and `check` commands.
 13. Added a source-package registry server with `kond registry`, the
     `publish`/`fetch` commands, JSON bundles, and bounded HTTP transport.
+14. Added package-declared native artifacts for POSIX C FFI. Registry bundles
+    carry native bytes in a base64 `binary` object, and `fetch` restores them
+    before registering the local dependency.

@@ -6,13 +6,15 @@ boundary: packages do not introduce a second execution or trust model.
 
 ## 16.1 Manifest
 
-Each package is a directory containing `kond.json`:
+Each package is a directory containing `kond.json`. A package that exposes a
+POSIX C FFI adapter can list package-relative shared libraries in `native`:
 
 ```json
 {
   "name": "app",
   "version": "0.1.0",
   "entry": "main.kd",
+  "native": ["native/libmath.so"],
   "dependencies": {
     "greeting": { "path": "../greeting", "version": "0.1.0" }
   }
@@ -28,6 +30,11 @@ An optional `library` field selects the source file exported to dependents. If
 it is absent, `entry` is used. The selected file must satisfy the normal
 `--lib` rules: it may contain `fn` and `condition` declarations, but no
 top-level executable statements, `route`, or `rewrite` declarations.
+Every `native` item must be a unique, project-relative regular file. FFI
+declarations should refer to it with a path relative to their `.kd` file, for
+example `from "native/libmath.so"`. Native artifacts are platform-specific and
+use the limited POSIX C ABI documented in the runtime ABI specification; they
+are not a stable Kond binary ABI.
 
 ## 16.2 Commands
 
@@ -63,12 +70,13 @@ resolved package's exact version and path relative to the root. The current
 implementation resolves local paths directly from `kond.json`; the lockfile
 is the reproducible resolution record and is not a registry cache.
 
-Checksums, semver ranges, binary artifacts, namespace isolation, and a stable
-package ABI are future extensions.
+Checksums, semver ranges, artifact signatures, namespace isolation, and a
+stable package ABI are future extensions.
 
-## 16.4 Source registry server
+## 16.4 Source/native registry server
 
-The reference CLI can host source-only package bundles with:
+The reference CLI can host source packages and their declared native artifacts
+with:
 
 ```sh
 kond registry .kond-registry --bind 127.0.0.1 --port 8787
@@ -86,7 +94,9 @@ layout is:
 
 The stored `package.json` is a JSON bundle containing `name`, `version`, and a
 `files` object. The files include the package `kond.json` and its entry or
-exported library source. A published bundle must have a safe package name and
+exported library source. If `kond.json` has a `native` array, the bundle also
+contains a `binary` object whose values are base64-encoded bytes keyed by the
+same relative paths. A published bundle must have a safe package name and
 version, matching identity in both locations, and no path traversal. Packages
 with non-empty `dependencies` are rejected until remote dependency resolution
 is specified.
@@ -110,6 +120,7 @@ kond fetch greeting 0.1.0 --registry http://127.0.0.1:8787 --project app
 
 `fetch` expands the bundle under `vendor/<name>`, records a local dependency,
 and refreshes `kond.lock`. Existing non-empty vendor directories are not
-overwritten. The registry currently has no TLS, authentication, semver range
-selection, checksums, or binary artifact format; it is intended for trusted
-local development or for use behind an appropriately secured proxy.
+overwritten, and native bytes are restored before dependency validation. The
+registry currently has no TLS, authentication, semver range selection,
+checksums, or artifact signatures; it is intended for trusted local
+development or for use behind an appropriately secured proxy.

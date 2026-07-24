@@ -59,6 +59,7 @@ enum class TokenKind {
     Greater,
     GreaterEqual,
     Arrow,
+    ReturnArrow,
     LeftArrow
 };
 
@@ -95,6 +96,12 @@ enum class ExprKind {
 };
 
 enum class LiteralKind { Integer, Float, String };
+
+// Foreign functions use a deliberately small, explicit C ABI.  Keeping the
+// ABI types separate from Kond's dynamic ValueKind makes the boundary
+// auditable and avoids pretending that List/Object have a stable native
+// representation.
+enum class FfiType { Void, Int64, Float64, Bool, CString };
 
 struct Expr {
     ExprKind kind = ExprKind::Literal;
@@ -229,6 +236,11 @@ struct FunctionDef {
     bool route = false;
     std::string routeMethod;
     std::string routePath;
+    bool foreign = false;
+    std::string ffiLibrary;
+    std::string ffiSymbol;
+    std::vector<FfiType> ffiParameterTypes;
+    FfiType ffiReturnType = FfiType::Void;
 };
 
 // Optimization rules are deliberately represented as ordinary Kond

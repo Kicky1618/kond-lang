@@ -93,7 +93,28 @@ The exact destructor model is deferred.
 
 ## 12.7 FFI boundary
 
-Foreign values enter as weakly known `Any` values unless trusted ABI contracts establish stronger conditions.
+The reference interpreter exposes a deliberately small POSIX C ABI through
+`extern fn` declarations:
+
+```kond
+unsafe extern fn add(left: Int, right: Int) -> Int
+    from "./libmath.so" as "my_add";
+```
+
+The mapping is `Int` to `int64_t`, `Float` to `double`, `Bool` to an
+`int64_t` zero/one value, `String` to a borrowed NUL-terminated
+`const char *`, and `Void` to no return value. Returned strings are copied into
+Kond-managed storage. Pointers, structures, collections, callbacks, and
+resource ownership are intentionally outside this ABI.
+
+For packages, a project-relative shared library may be listed in the manifest's
+`native` array and published as a native artifact. This packages the OS C
+ABI library itself; it does not define a portable Kond binary ABI.
+
+An FFI call is accepted only inside an explicit `unsafe` block or in
+`--mode unsafe`. Foreign results are conservatively marked opaque and enter
+the Kond value world as weakly known `Any` values unless a checked wrapper
+adds a stronger contract.
 
 Unsafe FFI adapters may produce proofs only after:
 

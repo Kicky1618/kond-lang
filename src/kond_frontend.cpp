@@ -182,6 +182,10 @@ private:
             }
             return Token{TokenKind::Plus, "+", start};
         case '-':
+            if (peek() == '>') {
+                advance();
+                return Token{TokenKind::ReturnArrow, "->", start};
+            }
             if (peek() == '=') {
                 advance();
                 return Token{TokenKind::MinusEqual, "-=", start};
@@ -261,6 +265,9 @@ public:
                 parseConditionDeclaration();
             } else if (consume("rewrite")) {
                 parseOptimizationDeclaration();
+            } else if (check("extern") ||
+                       (check("unsafe") && peek(1).kind == TokenKind::Identifier && peek(1).text == "extern")) {
+                parseForeignFunctionDeclaration();
             } else if (check("unsafe") || check("fn")) {
                 parseFunctionDeclaration(false);
             } else if (consume("route")) {
@@ -369,7 +376,8 @@ private:
         return token.text == "let" || token.text == "check" || token.text == "prove" || token.text == "require" ||
                token.text == "assume" || token.text == "return" || token.text == "if" || token.text == "else" ||
                token.text == "update" || token.text == "while" || token.text == "match" || token.text == "unsafe" ||
-               token.text == "for" || token.text == "route" || token.text == "fn" || token.text == "condition" ||
+               token.text == "for" || token.text == "route" || token.text == "fn" || token.text == "extern" ||
+               token.text == "condition" ||
                token.text == "rewrite";
     }
 
@@ -526,6 +534,144 @@ private:
             consume(TokenKind::Semicolon);
         }
         function.body = parseBlock();
+        if (program_->functions.count(function.name) != 0) {
+            fail("E0104", name.pos, "fn が重複しています: " + function.name);
+        }
+        program_->functions.emplace(function.name, std::move(function));
+    }
+
+    static bool isFfiTypeName(const std::string &name) {
+        return name == "Void" || name == "void" || name == "Unit" ||
+               name == "Int" || name == "int" || name == "Int64" || name == "i64" ||
+               name == "Float" || name == "float" || name == "Float64" || name == "f64" ||
+               name == "Bool" || name == "bool" || name == "Boolean" ||
+               name == "String" || name == "string" || name == "CStr" || name == "cstring";
+    }
+
+    static FfiType parseFfiType(const Token &token) {
+        if (token.text == "Void" || token.text == "void" || token.text == "Unit") {
+            return FfiType::Void;
+        }
+        if (token.text == "Int" || token.text == "int" || token.text == "Int64" || token.text == "i64") {
+            return FfiType::Int64;
+        }
+        if (token.text == "Float" || token.text == "float" || token.text == "Float64" || token.text == "f64") {
+            return FfiType::Float64;
+        }
+        if (token.text == "Bool" || token.text == "bool" || token.text == "Boolean") {
+            return FfiType::Bool;
+        }
+        if (token.text == "String" || token.text == "string" || token.text == "CStr" || token.text == "cstring") {
+            return FfiType::CString;
+        }
+        fail("E0120", token.pos,
+             "FFI型は Void, Int, Float, Bool, String のいずれかである必要があります: " + token.text);
+    }
+
+    FfiType parseFfiTypeName(const std::string &context) {
+        const Token type = expectIdentifier(context + " の型名が必要です");
+        return parseFfiType(type);
+    }
+
+    void parseForeignFunctionDeclaration() {
+        bool unsafe = consume("unsafe");
+        expect("extern", "FFI宣言には 'extern' が必要です");
+
+        // Both `unsafe extern fn ... from "..."` and
+        // `extern unsafe fn ... from "..."` are accepted so the trust
+        // boundary remains visible whichever declaration style a project
+        // prefers.
+        unsafe = consume("unsafe") || unsafe;
+
+        std::string library;
+        if (check(TokenKind::String)) {
+            library = advance().text;
+        }
+        expect("fn", "FFI宣言には 'fn' が必要です");
+        const Token name = expectIdentifier("FFI関数名には識別子が必要です");
+        expect(TokenKind::LParen, "FFI関数の引数リスト '(' が必要です");
+
+        std::vector<Param> params;
+        std::vector<FfiType> parameterTypes;
+        std::size_t parameterIndex = 0;
+        if (!check(TokenKind::RParen)) {
+            do {
+                const Token first = expectIdentifier("FFI引数には名前または型が必要です");
+                std::string parameterName;
+                FfiType parameterType;
+                if (consume(TokenKind::Colon)) {
+                    parameterName = first.text;
+                    parameterType = parseFfiTypeName("FFI引数 " + parameterName);
+                } else if (isFfiTypeName(first.text)) {
+                    // Also accept the compact C-like form `fn(Int, String)`.
+                    parameterName = "arg" + std::to_string(parameterIndex);
+                    parameterType = parseFfiType(first);
+                } else {
+                    fail("E0121", first.pos,
+                         "FFI引数には 'name: Type' または型名だけを指定してください");
+                }
+                params.push_back(Param{std::move(parameterName), nullptr, first.pos});
+                parameterTypes.push_back(parameterType);
+                ++parameterIndex;
+            } while (consume(TokenKind::Comma));
+        }
+        expect(TokenKind::RParen, "FFI関数の引数リスト ')' が必要です");
+
+        FfiType returnType = FfiType::Void;
+        if (consume(TokenKind::Arrow) || consume(TokenKind::ReturnArrow) || consume(TokenKind::Colon)) {
+            returnType = parseFfiTypeName("FFI戻り値");
+        }
+
+        if (consume("from")) {
+            const Token libraryToken = expect(TokenKind::String, "FFIには共有ライブラリのパスが必要です");
+            library = libraryToken.text;
+        }
+        if (library.empty()) {
+            fail("E0122", name.pos,
+                 "FFI宣言には共有ライブラリを指定してください (from \"lib.so\")");
+        }
+
+        std::string symbol = name.text;
+        if (consume("as")) {
+            symbol = expect(TokenKind::String, "FFIの 'as' にはシンボル名文字列が必要です").text;
+        }
+
+        std::vector<ConditionPtr> requiresList;
+        std::vector<ConditionPtr> ensuresList;
+        std::vector<FlowClause> flows;
+        while (check("requires") || check("ensures") || check("flow")) {
+            if (consume("requires")) {
+                requiresList.push_back(parseCondition());
+            } else if (consume("ensures")) {
+                ensuresList.push_back(parseCondition());
+            } else {
+                const Token flow = expect("flow");
+                FlowClause clause;
+                clause.pos = flow.pos;
+                clause.target = expectIdentifier("flow の出力名が必要です").text;
+                expect(TokenKind::LeftArrow, "flow には '<-' が必要です");
+                do {
+                    clause.sources.push_back(parseExpression());
+                } while (consume(TokenKind::Comma));
+                flows.push_back(std::move(clause));
+            }
+            consume(TokenKind::Semicolon);
+        }
+
+        FunctionDef function;
+        function.name = name.text;
+        function.params = std::move(params);
+        function.pos = name.pos;
+        function.unsafe = unsafe;
+        function.foreign = true;
+        function.ffiLibrary = std::move(library);
+        function.ffiSymbol = std::move(symbol);
+        function.ffiParameterTypes = std::move(parameterTypes);
+        function.ffiReturnType = returnType;
+        function.requiresList = std::move(requiresList);
+        function.ensures = std::move(ensuresList);
+        function.flows = std::move(flows);
+        consume(TokenKind::Semicolon);
         if (program_->functions.count(function.name) != 0) {
             fail("E0104", name.pos, "fn が重複しています: " + function.name);
         }

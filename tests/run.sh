@@ -6,7 +6,15 @@ KOND=$1
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
 new_root=$(mktemp -d)
-trap 'rm -rf "$new_root"' EXIT HUP INT TERM
+registry_pid=
+cleanup() {
+    if [ -n "$registry_pid" ]; then
+        kill "$registry_pid" 2>/dev/null || true
+        wait "$registry_pid" 2>/dev/null || true
+    fi
+    rm -rf "$new_root"
+}
+trap cleanup EXIT HUP INT TERM
 new_project="$new_root/hello"
 "$KOND" new "$new_project" >/dev/null
 test -f "$new_project/main.kd"
@@ -130,6 +138,73 @@ output=$("$KOND" run "$ROOT/examples/source_library_consumer.kd" --lib "$ROOT/ex
 test "$(printf '%s\n' "$output" | sed -n '1p')" = "40"
 test "$(printf '%s\n' "$output" | sed -n '2p')" = "0"
 "$KOND" check "$ROOT/examples/source_library_consumer.kd" --lib "$ROOT/examples/source_library.kd" >/dev/null
+
+if [ "$(uname -s)" = "Linux" ] && command -v cc >/dev/null 2>&1; then
+    ffi_library="$new_root/libkond_ffi_test.so"
+    cc -shared -fPIC "$ROOT/tests/ffi_fixture.c" -o "$ffi_library"
+    sed "s|@LIB@|$ffi_library|g" "$ROOT/tests/ffi.kd.in" > "$new_root/ffi.kd"
+    output=$("$KOND" run "$new_root/ffi.kd")
+    test "$(printf '%s\n' "$output" | sed -n '1p')" = "5"
+    test "$(printf '%s\n' "$output" | sed -n '2p')" = "6"
+    test "$(printf '%s\n' "$output" | sed -n '3p')" = "true"
+    test "$(printf '%s\n' "$output" | sed -n '4p')" = "hello, Kond"
+    test "$(printf '%s\n' "$output" | sed -n '5p')" = "9"
+    "$KOND" check "$new_root/ffi.kd" >/dev/null
+
+    sed "s|@LIB@|$ffi_library|g" "$ROOT/tests/ffi_safe.kd.in" > "$new_root/ffi_safe.kd"
+    if "$KOND" run "$new_root/ffi_safe.kd" >/dev/null 2>&1; then
+        echo "FFI call outside an unsafe boundary was unexpectedly accepted" >&2
+        exit 1
+    fi
+
+    ffi_package="$new_root/ffi-package"
+    cp -R "$ROOT/tests/ffi_package" "$ffi_package"
+    mkdir -p "$ffi_package/native"
+    cc -shared -fPIC "$ROOT/tests/ffi_fixture.c" -o "$ffi_package/native/libkond_package_ffi.so"
+
+    registry_root="$new_root/registry"
+    registry_port=$((18000 + ($$ % 2000)))
+    registry_url="http://127.0.0.1:$registry_port"
+    "$KOND" registry "$registry_root" --bind 127.0.0.1 --port "$registry_port" \
+        >"$new_root/registry.log" 2>&1 &
+    registry_pid=$!
+    sleep 0.1
+    if kill -0 "$registry_pid" 2>/dev/null; then
+        published=0
+        attempt=1
+        while [ "$attempt" -le 20 ]; do
+            if "$KOND" publish "$ffi_package" --registry "$registry_url" >/dev/null 2>&1; then
+                published=1
+                break
+            fi
+            sleep 0.1
+            attempt=$((attempt + 1))
+        done
+        test "$published" = 1
+
+        ffi_consumer="$new_root/ffi-consumer"
+        "$KOND" new "$ffi_consumer" >/dev/null
+        cp "$ROOT/tests/ffi_package_consumer.kd" "$ffi_consumer/main.kd"
+        "$KOND" fetch ffi-greeting 0.1.0 --registry "$registry_url" --project "$ffi_consumer" >/dev/null
+        test -f "$ffi_consumer/vendor/ffi-greeting/native/libkond_package_ffi.so"
+        cmp "$ffi_package/native/libkond_package_ffi.so" \
+            "$ffi_consumer/vendor/ffi-greeting/native/libkond_package_ffi.so"
+        test "$("$KOND" run "$ffi_consumer")" = "42"
+        "$KOND" check "$ffi_consumer" >/dev/null
+    fi
+    kill "$registry_pid" 2>/dev/null || true
+    wait "$registry_pid" 2>/dev/null || true
+    registry_pid=
+fi
+
+output=$("$KOND" run "$ROOT/examples/score_library_consumer.kd" --lib "$ROOT/examples/score_library.kd")
+test "$(printf '%s\n' "$output" | sed -n '1p')" = "4"
+test "$(printf '%s\n' "$output" | sed -n '2p')" = "285"
+test "$(printf '%s\n' "$output" | sed -n '3p')" = "71"
+test "$(printf '%s\n' "$output" | sed -n '4p')" = "A"
+test "$(printf '%s\n' "$output" | sed -n '5p')" = "D"
+test "$(printf '%s\n' "$output" | sed -n '6p')" = "F"
+"$KOND" check "$ROOT/examples/score_library_consumer.kd" --lib "$ROOT/examples/score_library.kd" >/dev/null
 
 if "$KOND" run "$ROOT/examples/source_library_consumer.kd" >/dev/null 2>&1; then
     echo "source library dependency was unexpectedly available" >&2

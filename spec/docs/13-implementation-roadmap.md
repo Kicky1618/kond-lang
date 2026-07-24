@@ -72,8 +72,9 @@ Fuzz compiler solver output against the proof kernel.
 
 The reference interpreter now provides the first executable `std.*` surface
 for core values, collections, strings, JSON, URL/HTML/security, HTTP, I/O, and
-predicates. Package/module versioning and a stable external ABI remain future
-work.
+predicates. A limited POSIX C FFI bridge is available for `Int`, `Float`,
+`Bool`, `String`, and `Void`; package/module versioning and a stable
+Kond-specific external ABI remain future work.
 
 Add proof-annotated APIs for:
 

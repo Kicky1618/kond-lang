@@ -1,0 +1,2 @@
+unsafe extern fn package_add(left: Int, right: Int) -> Int
+    from "native/libffi_math.so" as "ffi_package_add";

@@ -74,6 +74,7 @@ static int runPackageCommand(const std::string &command, int argc, char **argv, 
             const PackageGraph graph = resolvePackageGraph(directory);
             if (command == "install") {
                 (void)packageEntryFile(graph.root);
+                (void)packageNativeFiles(graph.root);
                 (void)packageLibraryFiles(graph);
                 writePackageLock(graph);
                 std::cout << "kond: resolved " << graph.dependencies.size()
@@ -126,6 +127,7 @@ static int runPackageCommand(const std::string &command, int argc, char **argv, 
             addLocalDependency(project, dependency);
             const PackageGraph graph = resolvePackageGraph(project);
             (void)packageEntryFile(graph.root);
+            (void)packageNativeFiles(graph.root);
             (void)packageLibraryFiles(graph);
             writePackageLock(graph);
             std::cout << "kond: added " << addedName
@@ -145,6 +147,7 @@ static int runPackageCommand(const std::string &command, int argc, char **argv, 
             removeDependency(project, positional.front());
             const PackageGraph graph = resolvePackageGraph(project);
             (void)packageEntryFile(graph.root);
+            (void)packageNativeFiles(graph.root);
             (void)packageLibraryFiles(graph);
             writePackageLock(graph);
             std::cout << "kond: removed " << positional.front()
@@ -441,6 +444,7 @@ int main(int argc, char **argv) {
         if (std::filesystem::is_directory(file, packageInputError)) {
             const PackageGraph packageGraph = resolvePackageGraph(file);
             validatePackageLock(packageGraph);
+            (void)packageNativeFiles(packageGraph.root);
             const std::vector<std::filesystem::path> packageLibraries = packageLibraryFiles(packageGraph);
             std::vector<std::string> resolvedLibraries;
             resolvedLibraries.reserve(packageLibraries.size() + sourceLibraries.size());

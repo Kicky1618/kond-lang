@@ -17,6 +17,7 @@ struct PackageManifest {
     std::string version = "0.1.0";
     std::string entry = "main.kd";
     std::string library;
+    std::vector<std::string> nativeFiles;
     std::map<std::string, PackageDependency> dependencies;
 };
 
@@ -34,6 +35,7 @@ PackageGraph resolvePackageGraph(const std::filesystem::path &directory);
 void validatePackageLock(const PackageGraph &graph);
 std::filesystem::path packageEntryFile(const PackageManifest &manifest);
 std::filesystem::path packageLibraryFile(const PackageManifest &manifest);
+std::vector<std::filesystem::path> packageNativeFiles(const PackageManifest &manifest);
 std::vector<std::filesystem::path> packageLibraryFiles(const PackageGraph &graph);
 
 void writePackageManifest(const PackageManifest &manifest);

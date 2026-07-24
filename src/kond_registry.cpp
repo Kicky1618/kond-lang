@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <cerrno>
 #include <fstream>
+#include <iterator>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <set>
@@ -48,6 +49,12 @@ std::string readFile(const fs::path &path) {
     return contents.str();
 }
 
+std::string readBinaryFile(const fs::path &path) {
+    std::ifstream input(path, std::ios::in | std::ios::binary);
+    if (!input) registryError("ファイルを開けません: " + path.string());
+    return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+}
+
 std::string jsonEscape(const std::string &value) {
     std::ostringstream output;
     for (unsigned char ch : value) {
@@ -74,6 +81,67 @@ std::string jsonEscape(const std::string &value) {
 
 std::string jsonQuoted(const std::string &value) {
     return "\"" + jsonEscape(value) + "\"";
+}
+
+std::string base64Encode(const std::string &bytes) {
+    static constexpr char alphabet[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string encoded;
+    encoded.reserve(((bytes.size() + 2) / 3) * 4);
+    for (std::size_t i = 0; i < bytes.size(); i += 3) {
+        const std::size_t remaining = bytes.size() - i;
+        const std::uint32_t first = static_cast<unsigned char>(bytes[i]);
+        const std::uint32_t second = remaining > 1
+                                         ? static_cast<unsigned char>(bytes[i + 1])
+                                         : 0;
+        const std::uint32_t third = remaining > 2
+                                        ? static_cast<unsigned char>(bytes[i + 2])
+                                        : 0;
+        const std::uint32_t value = (first << 16) | (second << 8) | third;
+        encoded.push_back(alphabet[(value >> 18) & 0x3f]);
+        encoded.push_back(alphabet[(value >> 12) & 0x3f]);
+        encoded.push_back(remaining > 1 ? alphabet[(value >> 6) & 0x3f] : '=');
+        encoded.push_back(remaining > 2 ? alphabet[value & 0x3f] : '=');
+    }
+    return encoded;
+}
+
+int base64Value(char ch) {
+    if (ch >= 'A' && ch <= 'Z') return ch - 'A';
+    if (ch >= 'a' && ch <= 'z') return ch - 'a' + 26;
+    if (ch >= '0' && ch <= '9') return ch - '0' + 52;
+    if (ch == '+') return 62;
+    if (ch == '/') return 63;
+    return -1;
+}
+
+std::string base64Decode(const std::string &encoded) {
+    if (encoded.size() % 4 != 0) registryInputError("binary artifactのbase64が不正です");
+    std::string bytes;
+    bytes.reserve((encoded.size() / 4) * 3);
+    for (std::size_t i = 0; i < encoded.size(); i += 4) {
+        const int first = base64Value(encoded[i]);
+        const int second = base64Value(encoded[i + 1]);
+        if (first < 0 || second < 0) registryInputError("binary artifactのbase64が不正です");
+
+        const bool thirdPadding = encoded[i + 2] == '=';
+        const bool fourthPadding = encoded[i + 3] == '=';
+        const int third = thirdPadding ? 0 : base64Value(encoded[i + 2]);
+        const int fourth = fourthPadding ? 0 : base64Value(encoded[i + 3]);
+        if (third < 0 || fourth < 0 || (thirdPadding && !fourthPadding) ||
+            ((thirdPadding || fourthPadding) && i + 4 != encoded.size())) {
+            registryInputError("binary artifactのbase64が不正です");
+        }
+
+        const std::uint32_t value = (static_cast<std::uint32_t>(first) << 18) |
+                                    (static_cast<std::uint32_t>(second) << 12) |
+                                    (static_cast<std::uint32_t>(third) << 6) |
+                                    static_cast<std::uint32_t>(fourth);
+        bytes.push_back(static_cast<char>((value >> 16) & 0xff));
+        if (!thirdPadding) bytes.push_back(static_cast<char>((value >> 8) & 0xff));
+        if (!fourthPadding) bytes.push_back(static_cast<char>(value & 0xff));
+    }
+    return bytes;
 }
 
 RegistryAddress parseRegistryUrl(const std::string &url) {
@@ -160,9 +228,19 @@ struct BundleInfo {
     std::string name;
     std::string version;
     std::map<std::string, std::string> files;
+    std::map<std::string, std::string> binaryFiles;
     std::string entry;
     std::string library;
+    std::vector<std::string> nativeFiles;
 };
+
+void validateBundlePath(const std::string &file) {
+    const fs::path path(file);
+    if (file.empty() || path.is_absolute()) registryInputError("bundleのファイルパスが不正です");
+    for (const auto &part : path) {
+        if (part == "." || part == "..") registryInputError("bundleのファイルパスが不正です");
+    }
+}
 
 BundleInfo parseBundle(const std::string &body) {
     Value document;
@@ -184,6 +262,20 @@ BundleInfo parseBundle(const std::string &body) {
         }
         bundle.files.emplace(entry.first, entry.second.string);
     }
+    const Value *binaryValue = findJsonField(document, "binary", "bundle");
+    if (binaryValue) {
+        requireObject(*binaryValue, "bundle.binary");
+        for (const auto &entry : *binaryValue->object) {
+            if (entry.second.kind != ValueKind::String) {
+                registryInputError("bundle.binaryの値はbase64 Stringである必要があります");
+            }
+            if (bundle.files.count(entry.first) != 0) {
+                registryInputError("bundleの同じパスをtextとbinaryの両方に指定できません: " + entry.first);
+            }
+            (void)base64Decode(entry.second.string);
+            bundle.binaryFiles.emplace(entry.first, entry.second.string);
+        }
+    }
     const auto manifest = bundle.files.find("kond.json");
     if (manifest == bundle.files.end()) registryInputError("bundleにkond.jsonがありません");
 
@@ -201,6 +293,23 @@ BundleInfo parseBundle(const std::string &body) {
     }
     bundle.entry = jsonStringField(manifestDocument, "entry", "main.kd", false, "bundle.kond.json");
     bundle.library = jsonStringField(manifestDocument, "library", {}, false, "bundle.kond.json");
+    const Value *nativeValue = findJsonField(manifestDocument, "native", "bundle.kond.json");
+    if (nativeValue) {
+        if (nativeValue->kind != ValueKind::Array || !nativeValue->array) {
+            registryInputError("bundle.kond.json.nativeはJSON arrayである必要があります");
+        }
+        std::set<std::string> nativeNames;
+        for (const Value &item : *nativeValue->array) {
+            if (item.kind != ValueKind::String) {
+                registryInputError("bundle.kond.json.nativeの各要素はStringである必要があります");
+            }
+            validateBundlePath(item.string);
+            if (!nativeNames.insert(item.string).second) {
+                registryInputError("bundle.kond.json.nativeに重複したファイルがあります: " + item.string);
+            }
+            bundle.nativeFiles.push_back(item.string);
+        }
+    }
     const Value *dependencies = findJsonField(manifestDocument, "dependencies", "bundle.kond.json");
     if (dependencies) {
         if (dependencies->kind != ValueKind::Object || !dependencies->object) {
@@ -212,25 +321,24 @@ BundleInfo parseBundle(const std::string &body) {
     }
     validatePackagePart(bundle.name, "package name");
     validatePackagePart(bundle.version, "package version");
-    if (bundle.entry.empty() || fs::path(bundle.entry).is_absolute()) registryInputError("bundle.entryが不正です");
-    if (!bundle.library.empty() && (fs::path(bundle.library).is_absolute())) registryInputError("bundle.libraryが不正です");
+    validateBundlePath(bundle.entry);
+    if (!bundle.library.empty()) validateBundlePath(bundle.library);
     for (const auto &file : bundle.files) {
-        const fs::path path(file.first);
-        if (file.first.empty() || path.is_absolute()) {
-            registryInputError("bundleのファイルパスが不正です");
-        }
-        for (const auto &part : path) {
-            if (part == "." || part == "..") registryInputError("bundleのファイルパスが不正です");
-        }
+        validateBundlePath(file.first);
+    }
+    for (const auto &file : bundle.binaryFiles) {
+        validateBundlePath(file.first);
     }
     const auto validateFile = [&](const std::string &file) {
-        const fs::path path(file);
-        if (file.empty() || path.is_absolute()) registryInputError("bundleのファイルパスが不正です");
-        for (const auto &part : path) if (part == "..") registryInputError("bundleがプロジェクト外を参照しています");
         if (bundle.files.count(file) == 0) registryInputError("bundleに必要なファイルがありません: " + file);
     };
     validateFile(bundle.entry);
     if (!bundle.library.empty()) validateFile(bundle.library);
+    for (const std::string &nativeFile : bundle.nativeFiles) {
+        if (bundle.binaryFiles.count(nativeFile) == 0) {
+            registryInputError("bundleに必要なbinary artifactがありません: " + nativeFile);
+        }
+    }
     return bundle;
 }
 
@@ -241,9 +349,17 @@ std::string buildBundle(const PackageManifest &manifest) {
     const fs::path entry = packageEntryFile(manifest);
     const fs::path library = packageLibraryFile(manifest);
     std::map<std::string, std::string> files;
+    std::map<std::string, std::string> binaryFiles;
     files.emplace("kond.json", readFile(manifest.root / "kond.json"));
     files.emplace(manifest.entry, readFile(entry));
     if (!manifest.library.empty()) files.emplace(manifest.library, readFile(library));
+    const std::vector<fs::path> nativePaths = packageNativeFiles(manifest);
+    for (std::size_t i = 0; i < nativePaths.size(); ++i) {
+        if (files.count(manifest.nativeFiles[i]) != 0) {
+            registryError("native artifactがソースファイルと同じパスです: " + manifest.nativeFiles[i]);
+        }
+        binaryFiles.emplace(manifest.nativeFiles[i], base64Encode(readBinaryFile(nativePaths[i])));
+    }
 
     std::ostringstream output;
     output << "{\n  \"name\": " << jsonQuoted(manifest.name)
@@ -255,7 +371,18 @@ std::string buildBundle(const PackageManifest &manifest) {
         first = false;
         output << "    " << jsonQuoted(file.first) << ": " << jsonQuoted(file.second);
     }
-    output << "\n  }\n}\n";
+    output << "\n  }";
+    if (!binaryFiles.empty()) {
+        output << ",\n  \"binary\": {\n";
+        first = true;
+        for (const auto &file : binaryFiles) {
+            if (!first) output << ",\n";
+            first = false;
+            output << "    " << jsonQuoted(file.first) << ": " << jsonQuoted(file.second);
+        }
+        output << "\n  }";
+    }
+    output << "\n}\n";
     return output.str();
 }
 
@@ -574,6 +701,21 @@ void fetchPackage(const fs::path &projectDirectory, const std::string &name,
         if (!output) registryError("取得したファイルを書き込めません: " + destination.string());
         output << file.second;
         if (!output) registryError("取得したファイルを書き込めません: " + destination.string());
+    }
+    for (const auto &file : bundle.binaryFiles) {
+        const fs::path relative(file.first);
+        if (relative.is_absolute()) registryError("取得したbinary artifactのパスが絶対パスです");
+        for (const auto &part : relative) {
+            if (part == "..") registryError("取得したbinary artifactがvendor外を参照しています");
+        }
+        const fs::path destination = packageDirectory / relative;
+        fs::create_directories(destination.parent_path(), error);
+        if (error) registryError("binary artifactの取得先ディレクトリを作成できません");
+        const std::string bytes = base64Decode(file.second);
+        std::ofstream output(destination, std::ios::out | std::ios::binary | std::ios::trunc);
+        if (!output) registryError("取得したbinary artifactを書き込めません: " + destination.string());
+        output.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+        if (!output) registryError("取得したbinary artifactを書き込めません: " + destination.string());
     }
     addLocalDependency(project.root, packageDirectory);
     const PackageGraph graph = resolvePackageGraph(project.root);

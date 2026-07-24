@@ -829,6 +829,12 @@ private:
 bool llvmJitAvailable() { return true; }
 
 void runJit(const Program &program, const std::string &entry, const JitOptions &options) {
+    for (const auto &definition : program.functions) {
+        if (definition.second.foreign) {
+            throw std::runtime_error(
+                "LLVM JIT backend は FFI (extern fn) をまだ扱えません。FFIを使うプログラムはインタプリタで実行してください");
+        }
+    }
     JitCompiler compiler(program, options);
     compiler.run(entry);
 }

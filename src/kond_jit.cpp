@@ -6,7 +6,10 @@
 
 #if KOND_HAS_LLVM_JIT
 
+#include <llvm/Config/llvm-config.h>
+#if LLVM_VERSION_MAJOR >= 19
 #include <llvm/ExecutionEngine/Orc/AbsoluteSymbols.h>
+#endif
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/ExecutionEngine/Orc/Mangling.h>
 #include <llvm/IR/Constants.h>

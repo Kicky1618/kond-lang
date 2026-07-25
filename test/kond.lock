@@ -1,7 +1,0 @@
-{
-  "lockfileVersion": 1,
-  "root": {"name": "test", "version": "0.1.0"},
-  "packages": {
-    "ffi-math": {"version": "0.1.0", "path": "vendor/ffi-math"}
-  }
-}

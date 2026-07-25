@@ -1,8 +1,0 @@
-{
-  "name": "ffi-math",
-  "version": "0.1.0",
-  "entry": "lib.kd",
-  "library": "lib.kd",
-  "native": ["native/libffi_math.so"],
-  "dependencies": {}
-}

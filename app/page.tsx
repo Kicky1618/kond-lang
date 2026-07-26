@@ -42,6 +42,37 @@ const principles = [
   },
 ];
 
+const capabilities = [
+  {
+    number: "01",
+    label: "CONDITIONS",
+    title: "条件を、値の一部にする。",
+    description: "check と require で得た証拠を値と一緒に運び、if の内側だけでなく、その先の処理まで安全に引き継ぎます。",
+    tone: "text-lime",
+  },
+  {
+    number: "02",
+    label: "OWNERSHIP",
+    title: "所有権を、履歴として追う。",
+    description: "move と borrow を決定的に検査。使える値・返すべき値が、実行前から見えるようになります。",
+    tone: "text-cyan",
+  },
+  {
+    number: "03",
+    label: "SECURITY",
+    title: "信頼境界を、コードに書く。",
+    description: "safe / verified / unsafe を使い分け、検証できない判断や declassify を明示的な境界に閉じ込めます。",
+    tone: "text-[#f7ce89]",
+  },
+  {
+    number: "04",
+    label: "PERFORMANCE",
+    title: "証明できるところだけ速くする。",
+    description: "意味論を変えない書き換えだけを最適化。安全性とパフォーマンスを同じ契約の上で扱います。",
+    tone: "text-[#d9bdff]",
+  },
+];
+
 export default function HomePage() {
   return (
     <main className="overflow-hidden bg-ink">
@@ -218,6 +249,66 @@ export default function HomePage() {
               <p className="mt-3 text-[13px] leading-[1.75] text-[#84918d]">証明できる書き換えだけを許す、意味論と速度の契約。</p>
               <span className="mt-7 inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#78847f] transition-colors group-hover:text-[#f7ce89]">See the rules <ChevronRight className="h-3 w-3" /></span>
             </Link>
+          </div>
+        </PageContainer>
+      </section>
+
+      <section className="border-b border-white/10 bg-[#10161a]" id="capabilities">
+        <PageContainer className="py-22 lg:py-28">
+          <div className="grid gap-10 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20">
+            <div>
+              <Eyebrow>04 / Built into the language</Eyebrow>
+              <h2 className="mt-5 max-w-[400px] text-[clamp(2.35rem,4.8vw,4.4rem)] font-650 leading-[0.97] tracking-[-0.075em] text-white">
+                安全性を、<br /><span className="text-lime">機能</span>ではなく<br />習慣にする。
+              </h2>
+              <p className="mt-7 max-w-[370px] text-[15px] leading-[1.85] text-[#899591]">
+                Kond の主要な仕組みは、ライブラリや規約の外側ではなく、言語の流れそのものにあります。
+              </p>
+            </div>
+            <div className="grid gap-px overflow-hidden rounded-[18px] border border-white/10 bg-white/10 sm:grid-cols-2">
+              {capabilities.map((capability) => (
+                <article className="group bg-[#141b20] p-6 transition-colors duration-300 hover:bg-[#192228] sm:p-7" key={capability.number}>
+                  <div className="flex items-center justify-between">
+                    <span className={`font-mono text-[10px] tracking-[0.16em] ${capability.tone}`}>{capability.number}</span>
+                    <span className="font-mono text-[9px] tracking-[0.14em] text-[#68756f]">{capability.label}</span>
+                  </div>
+                  <h3 className="mt-14 text-[20px] font-650 leading-[1.15] tracking-[-0.05em] text-white">{capability.title}</h3>
+                  <p className="mt-4 text-[13px] leading-[1.8] text-[#87938f]">{capability.description}</p>
+                  <div className={`mt-6 h-px w-8 opacity-60 transition-all duration-300 group-hover:w-16 ${capability.tone.replace("text-", "bg-")}`} />
+                </article>
+              ))}
+            </div>
+          </div>
+        </PageContainer>
+      </section>
+
+      <section className="border-b border-white/10 bg-[#e7f0e4] text-ink" id="start">
+        <PageContainer className="py-18 lg:py-22">
+          <div className="grid items-center gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:gap-20">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#658d2b]">05 / Start locally</p>
+              <h2 className="mt-5 text-[clamp(2.4rem,5vw,4.8rem)] font-650 leading-[0.95] tracking-[-0.08em]">まずは、<span className="text-[#658d2b]">1 ファイル。</span></h2>
+              <p className="mt-6 max-w-[400px] text-[15px] leading-[1.85] text-[#53615a]">リポジトリを取得して、サンプルを check。Kond の考え方は、コードを動かしながら読めます。</p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link className="button-primary bg-ink text-white hover:bg-[#20292d]" href="/docs">
+                  クイックスタート
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+                <Link className="button-secondary border-ink/20 text-ink hover:border-ink/50" href="/docs/core-model">
+                  コアモデルを見る
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+            <CodeWindow
+              badge="terminal"
+              bodyClassName="px-4 py-6 text-[12px] sm:px-7 sm:py-8 sm:text-[13px]"
+              code={["$ git clone https://github.com/Kicky1618/kond-lang.git", "$ cd kond-lang", "$ make", "$ ./kond check spec/examples/server.kd", "", "✓ 0 errors · all conditions verified"]}
+              footer="ready in a few commands"
+              lang="console"
+              status="local / verified"
+              title="quickstart"
+            />
           </div>
         </PageContainer>
       </section>

@@ -295,6 +295,24 @@ printf '%s\n' "$ownership_trace" | grep -q 'ownership: xs: Own -> Moved'
 
 if command -v python3 >/dev/null 2>&1; then
     python3 "$ROOT/tests/lsp_test.py" "$KOND"
+    python3 "$ROOT/tests/http_test.py" "$KOND"
+fi
+
+if "$KOND" >/dev/null 2>&1; then
+    echo "kond without a command unexpectedly succeeded" >&2
+    exit 1
+fi
+if "$KOND" run >/dev/null 2>&1; then
+    echo "kond run without a file unexpectedly succeeded" >&2
+    exit 1
+fi
+if "$KOND" run "$ROOT/examples/core.kd" --mode invalid >/dev/null 2>&1; then
+    echo "kond accepted an invalid mode" >&2
+    exit 1
+fi
+if "$KOND" run "$ROOT/examples/core.kd" --port 65536 >/dev/null 2>&1; then
+    echo "kond accepted an out-of-range port" >&2
+    exit 1
 fi
 
 if "$KOND" run "$ROOT/examples/stale_condition.kd" >/dev/null 2>&1; then

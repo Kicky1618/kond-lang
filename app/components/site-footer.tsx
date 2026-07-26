@@ -12,7 +12,8 @@ export default function SiteFooter() {
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[10px] uppercase tracking-[0.14em]">
           <Link className="transition-colors hover:text-lime" href="/docs">Specification</Link>
-          <Link className="transition-colors hover:text-lime" href="/#quickstart">Quick start</Link>
+          <Link className="transition-colors hover:text-lime" href="/#capabilities">Capabilities</Link>
+          <Link className="transition-colors hover:text-lime" href="/#start">Quick start</Link>
           <span>© 2026 Kond</span>
         </div>
       </PageContainer>

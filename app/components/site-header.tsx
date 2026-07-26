@@ -24,8 +24,9 @@ export default function SiteHeader() {
 
       <nav aria-label="メインナビゲーション" className="hidden items-center gap-8 text-[13px] text-smoke md:flex">
         <Link className="transition-colors hover:text-white" href="/#principles">Principles</Link>
+        <Link className="transition-colors hover:text-white" href="/#capabilities">Capabilities</Link>
         <Link className="transition-colors hover:text-white" href="/docs">Docs</Link>
-        <Link className="transition-colors hover:text-white" href="/#quickstart">Quick start</Link>
+        <Link className="transition-colors hover:text-white" href="/#start">Quick start</Link>
       </nav>
 
       <Link className="group hidden items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-lime sm:flex" href="/docs">

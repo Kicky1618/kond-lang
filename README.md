@@ -30,19 +30,23 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-## ドキュメントサイト
+## ドキュメントWebサイト
 
-Next.js + React + Turbopack + UnoCSS のサイトを同じリポジトリ内で管理しています。
+Next.js 製のドキュメントサイトを同じリポジトリで管理しています。
 
 ```sh
 npm install
 npm run dev
 ```
 
-トップページは `http://localhost:3000/`、仕様書は `http://localhost:3000/docs` から確認できます。
-本番用の確認は `npm run build && npm run start` です。
+開発サーバーは `http://localhost:3000/kond-lang/` で起動します。
+トップページからドキュメント一覧、章ページへ移動できます。
+本番ビルドは次のコマンドで確認できます。
 
-`-DKOND_NATIVE_OPTIMIZATIONS=ON` を追加すると `-march=native` を有効にします。
+```sh
+npm run build
+npm run start
+```
 
 ## LSP
 
@@ -278,4 +282,5 @@ PIRの証明クラスを混同せず、現在は以下の `ExactEq` 高速化を
 これはDraft 0.2の実行可能なコア実装です。完全なCIR/FIR/PIRシリアライズ、汎用SMT連携、ユーザー定義linear protocol automata、完全な部分move解析、DB接続、WASMバックエンド、安定したKond独自のバイナリパッケージABIは未実装です。FFIは限定されたC ABIの共有ライブラリ呼び出しまでで、native artifactのregistry公開はPOSIX向けです。`kond registry` は開発用の逐次HTTPサーバーであり、本番向けの認証・TLS・署名検証は別途必要です。`serve` は標準C++とOSのソケットAPIだけで実装した逐次HTTPサーバーで、`route` を実際のHTTP入力境界として実行します。データベース接続は行わず、`database.query` はSQL sink の契約を検査する標準スタブです。
 
 LLVM が検出されたビルドでは `--jit` が整数値サブセットを LLVM IR に lowering し、LLVM ORC の `LLJIT` でネイティブコードとして実行します。対応範囲は Int64 の算術／bitwise 演算、条件、`if`、`while`、関数呼び出し、`print`、`requires`／`ensures`／`where` の実行時ガードです。List、Object、HTTP 値、borrow／move、動的な標準ライブラリ API はインタプリタで実行してください。`--mode verified` の静的証明は JIT backend では未対応なので、JIT では拒否します。`--dump-llvm` で生成 IR を確認できます。
+
 # kond-lang

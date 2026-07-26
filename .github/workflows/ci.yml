@@ -35,12 +35,6 @@ jobs:
             artifact: kond-windows-arm64
             test: false
             llvm: false
-          - name: macOS x86_64
-            runner: macos-13
-            cmake_arch: ""
-            artifact: kond-macos-x86_64
-            test: false
-            llvm: false
           - name: macOS Arm64
             runner: macos-14
             cmake_arch: ""

@@ -7,9 +7,7 @@
 #if KOND_HAS_LLVM_JIT
 
 #include <llvm/Config/llvm-config.h>
-#if LLVM_VERSION_MAJOR >= 19
 #include <llvm/ExecutionEngine/Orc/AbsoluteSymbols.h>
-#endif
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/ExecutionEngine/Orc/Mangling.h>
 #include <llvm/IR/Constants.h>
@@ -827,9 +825,13 @@ private:
         auto makeSymbol = [](auto *fn) {
             return orc::ExecutorSymbolDef::fromPtr(fn, JITSymbolFlags::Exported);
         };
-#else
+#elif LLVM_VERSION_MAJOR >= 17
         auto makeSymbol = [](auto *fn) {
             return orc::ExecutorSymbolDef(orc::ExecutorAddr::fromPtr(fn), JITSymbolFlags::Exported);
+        };
+#else
+        auto makeSymbol = [](auto *fn) {
+            return JITEvaluatedSymbol(pointerToJITTargetAddress(fn), JITSymbolFlags::Exported);
         };
 #endif
         symbols[mangle("kond_jit_print_begin")] = makeSymbol(&kond_jit_print_begin);

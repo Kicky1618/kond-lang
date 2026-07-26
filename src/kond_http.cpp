@@ -112,7 +112,7 @@ static std::size_t parseContentLength(const std::string &text) {
     return result;
 }
 
-static HttpRequestData readHttpRequest(int client, std::size_t maxBodyBytes) {
+static HttpRequestData readHttpRequest(Socket client, std::size_t maxBodyBytes) {
     constexpr std::size_t maxHeaderBytes = 64 * 1024;
     std::string input;
     input.reserve(8192);
@@ -263,7 +263,7 @@ static bool validHttpHeaderName(std::string_view name) {
     return true;
 }
 
-static bool sendHttpBytes(int client, std::string_view data) {
+static bool sendHttpBytes(Socket client, std::string_view data) {
     std::size_t sent = 0;
     while (sent < data.size()) {
 #ifdef MSG_NOSIGNAL
@@ -285,7 +285,7 @@ static bool sendHttpBytes(int client, std::string_view data) {
     return true;
 }
 
-static bool writeHttpResponse(int client, const HttpResponse &response, bool headRequest) {
+static bool writeHttpResponse(Socket client, const HttpResponse &response, bool headRequest) {
     std::ostringstream output;
     const int status = response.status >= 100 && response.status <= 599 ? response.status : 500;
     output << "HTTP/1.1 " << status << ' ' << httpReasonPhrase(status) << "\r\n";
@@ -322,8 +322,9 @@ static Socket createHttpListener(const std::string &bindAddress, std::uint16_t p
         if (server == kInvalidSocket) continue;
         int reuse = 1;
         ::setsockopt(server, SOL_SOCKET, SO_REUSEADDR,
-                     reinterpret_cast<const char *>(&reuse), sizeof(reuse));
-        if (::bind(server, address->ai_addr, address->ai_addrlen) == 0 && ::listen(server, 64) == 0) break;
+                     reinterpret_cast<const char *>(&reuse), static_cast<SocketLength>(sizeof(reuse)));
+        if (::bind(server, address->ai_addr, static_cast<SocketLength>(address->ai_addrlen)) == 0 &&
+            ::listen(server, 64) == 0) break;
         closeSocket(server);
         server = kInvalidSocket;
     }

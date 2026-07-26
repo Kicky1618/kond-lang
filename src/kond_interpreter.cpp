@@ -20,6 +20,41 @@ static std::string numberString(double value) {
     return output.str();
 }
 
+static bool checkedAdd(std::int64_t left, std::int64_t right, std::int64_t &result) {
+    if ((right > 0 && left > std::numeric_limits<std::int64_t>::max() - right) ||
+        (right < 0 && left < std::numeric_limits<std::int64_t>::min() - right)) {
+        return true;
+    }
+    result = left + right;
+    return false;
+}
+
+static bool checkedSub(std::int64_t left, std::int64_t right, std::int64_t &result) {
+    if ((right > 0 && left < std::numeric_limits<std::int64_t>::min() + right) ||
+        (right < 0 && left > std::numeric_limits<std::int64_t>::max() + right)) {
+        return true;
+    }
+    result = left - right;
+    return false;
+}
+
+static bool checkedMul(std::int64_t left, std::int64_t right, std::int64_t &result) {
+    constexpr std::int64_t minimum = std::numeric_limits<std::int64_t>::min();
+    constexpr std::int64_t maximum = std::numeric_limits<std::int64_t>::max();
+    if (left == 0 || right == 0) {
+        result = 0;
+        return false;
+    }
+    if ((left == -1 && right == minimum) || (right == -1 && left == minimum)) return true;
+    if (left > 0) {
+        if (right > 0 ? left > maximum / right : right < minimum / left) return true;
+    } else if (right > 0 ? left < minimum / right : left < maximum / right) {
+        return true;
+    }
+    result = left * right;
+    return false;
+}
+
 static std::string valueToString(const Value &value);
 static Value dereference(Value value);
 
@@ -1335,7 +1370,7 @@ private:
             }
             if (left.kind == ValueKind::Integer && right.kind == ValueKind::Integer) {
                 std::int64_t result = 0;
-                if (__builtin_add_overflow(left.integer, right.integer, &result)) {
+                if (checkedAdd(left.integer, right.integer, result)) {
                     fail("E1208", pos, "Int64 の加算がオーバーフローします");
                 }
                 return finish(Value::integerValue(result));
@@ -1348,7 +1383,7 @@ private:
         } else if (op == "-") {
             if (left.kind == ValueKind::Integer && right.kind == ValueKind::Integer) {
                 std::int64_t result = 0;
-                if (__builtin_sub_overflow(left.integer, right.integer, &result)) {
+                if (checkedSub(left.integer, right.integer, result)) {
                     fail("E1208", pos, "Int64 の減算がオーバーフローします");
                 }
                 return finish(Value::integerValue(result));
@@ -1361,7 +1396,7 @@ private:
         } else if (op == "*") {
             if (left.kind == ValueKind::Integer && right.kind == ValueKind::Integer) {
                 std::int64_t result = 0;
-                if (__builtin_mul_overflow(left.integer, right.integer, &result)) {
+                if (checkedMul(left.integer, right.integer, result)) {
                     fail("E1208", pos, "Int64 の乗算がオーバーフローします");
                 }
                 return finish(Value::integerValue(result));
@@ -1799,7 +1834,7 @@ private:
                     fail("E1303", expression->pos, "std.core.range の要素数が上限を超えています");
                 }
                 std::int64_t next = 0;
-                if (__builtin_add_overflow(current, step.integer, &next)) break;
+                if (checkedAdd(current, step.integer, next)) break;
                 current = next;
             }
             std::uint32_t flow = start.flow | end.flow | step.flow;
@@ -1826,7 +1861,7 @@ private:
                 const Value list = requireList(evalExpr(item), "std.list.concat");
                 flow |= list.flow;
                 const auto size = static_cast<std::int64_t>(list.array->size());
-                if (__builtin_add_overflow(length, size, &length)) {
+                if (checkedAdd(length, size, length)) {
                     fail("E1208", expression->pos, "std.list.concat の長さがInt64を超えます");
                 }
             }
@@ -2382,7 +2417,7 @@ private:
                 while ((step > 0 && current < end) || (step < 0 && current > end)) {
                     values.push_back(Value::integerValue(current));
                     std::int64_t next = 0;
-                    if (__builtin_add_overflow(current, step, &next)) break;
+                    if (checkedAdd(current, step, next)) break;
                     current = next;
                     if (values.size() > 1000000) fail("E1303", pos, "std.core.range の要素数が上限を超えています");
                 }
@@ -2467,7 +2502,7 @@ private:
                 if (gcd == 0) return withFlow(Value::integerValue(0));
                 const std::int64_t quotient = left / gcd;
                 std::int64_t result = 0;
-                if (__builtin_mul_overflow(quotient, right, &result)) {
+                if (checkedMul(quotient, right, result)) {
                     fail("E1208", pos, "std.math.lcm がオーバーフローします");
                 }
                 return withFlow(Value::integerValue(result < 0 ? -result : result));
@@ -2727,7 +2762,7 @@ private:
                     const Value value = dereference(item);
                     if (!value.isNumber()) fail("E1303", pos, "std.list.sum の要素はNumberである必要があります");
                     if (value.kind == ValueKind::Integer && !floating) {
-                        if (__builtin_add_overflow(integerSum, value.integer, &integerSum)) fail("E1208", pos, "std.list.sum がオーバーフローします");
+                        if (checkedAdd(integerSum, value.integer, integerSum)) fail("E1208", pos, "std.list.sum がオーバーフローします");
                     } else {
                         if (!floating) {
                             floatSum = static_cast<double>(integerSum);
@@ -3591,8 +3626,8 @@ private:
         std::int64_t movement = 0;
         std::int64_t finalValue = 0;
         const std::int64_t signedStride = increasing ? amount : -amount;
-        if (__builtin_mul_overflow(signedIterations, signedStride, &movement) ||
-            __builtin_add_overflow(start, movement, &finalValue)) {
+        if (checkedMul(signedIterations, signedStride, movement) ||
+            checkedAdd(start, movement, finalValue)) {
             return false;
         }
 

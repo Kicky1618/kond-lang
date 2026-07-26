@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <algorithm>
+#include <limits>
 #include <stdexcept>
 
 #ifdef _WIN32
@@ -33,11 +35,13 @@ inline void ensureSocketsInitialized() {
 }
 
 inline bool socketInterrupted() { return WSAGetLastError() == WSAEINTR; }
-inline int socketReceive(Socket socket, char *buffer, int length) {
-    return ::recv(socket, buffer, length, 0);
+inline int socketReceive(Socket socket, char *buffer, std::size_t length) {
+    return ::recv(socket, buffer, static_cast<int>(std::min(length,
+        static_cast<std::size_t>(std::numeric_limits<int>::max()))), 0);
 }
-inline int socketSend(Socket socket, const char *buffer, int length, int flags) {
-    return ::send(socket, buffer, length, flags);
+inline int socketSend(Socket socket, const char *buffer, std::size_t length, int flags) {
+    return ::send(socket, buffer, static_cast<int>(std::min(length,
+        static_cast<std::size_t>(std::numeric_limits<int>::max()))), flags);
 }
 inline void closeSocket(Socket socket) { ::closesocket(socket); }
 inline void shutdownSocket(Socket socket) { ::shutdown(socket, SD_BOTH); }

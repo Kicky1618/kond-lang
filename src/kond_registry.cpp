@@ -401,7 +401,8 @@ Socket connectRegistry(const RegistryAddress &address) {
     for (struct addrinfo *entry = addresses; entry != nullptr; entry = entry->ai_next) {
         client = ::socket(entry->ai_family, entry->ai_socktype, entry->ai_protocol);
         if (client == kInvalidSocket) continue;
-        if (::connect(client, entry->ai_addr, entry->ai_addrlen) == 0) break;
+        if (::connect(client, entry->ai_addr,
+                      static_cast<SocketLength>(entry->ai_addrlen)) == 0) break;
         closeSocket(client);
         client = kInvalidSocket;
     }

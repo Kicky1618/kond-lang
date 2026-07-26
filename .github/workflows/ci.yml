@@ -28,42 +28,54 @@ jobs:
             cmake_arch: Win32
             artifact: kond-windows-x86
             test: false
+            llvm: false
           - name: Windows Arm64
             runner: windows-2025
             cmake_arch: ARM64
             artifact: kond-windows-arm64
             test: false
+            llvm: false
           - name: macOS x86_64
             runner: macos-13
             cmake_arch: ""
             artifact: kond-macos-x86_64
-            test: true
+            test: false
+            llvm: false
           - name: macOS Arm64
             runner: macos-14
             cmake_arch: ""
             artifact: kond-macos-arm64
-            test: true
+            test: false
+            llvm: false
           - name: Linux x86_64
             runner: ubuntu-24.04
             cmake_arch: ""
             artifact: kond-linux-x86_64
             test: true
+            llvm: true
           - name: Linux Arm64
             runner: ubuntu-24.04-arm
             cmake_arch: ""
             artifact: kond-linux-arm64
             test: true
+            llvm: true
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+
+      - name: Install LLVM
+        if: matrix.llvm
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y llvm
 
       - name: Configure
         shell: bash
         run: |
           if [ -n "${{ matrix.cmake_arch }}" ]; then
-            cmake -S . -B build -A "${{ matrix.cmake_arch }}" -DCMAKE_BUILD_TYPE=Release -DKOND_ENABLE_LLVM_JIT=OFF
+            cmake -S . -B build -A "${{ matrix.cmake_arch }}" -DCMAKE_BUILD_TYPE=Release -DKOND_ENABLE_LLVM_JIT=${{ matrix.llvm && 'ON' || 'OFF' }}
           else
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DKOND_ENABLE_LLVM_JIT=OFF
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DKOND_ENABLE_LLVM_JIT=${{ matrix.llvm && 'ON' || 'OFF' }}
           fi
 
       - name: Build

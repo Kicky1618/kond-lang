@@ -15,70 +15,121 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  make:
-    name: Make (${{ matrix.compiler }})
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
+  native-build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         include:
-          - compiler: GCC
-            cxx: g++
-          - compiler: Clang
-            cxx: clang++
+          - name: Windows x86
+            runner: windows-2025
+            cmake_arch: Win32
+            artifact: kond-windows-x86
+            test: false
+          - name: Windows Arm64
+            runner: windows-2025
+            cmake_arch: ARM64
+            artifact: kond-windows-arm64
+            test: false
+          - name: macOS x86_64
+            runner: macos-13
+            cmake_arch: ""
+            artifact: kond-macos-x86_64
+            test: true
+          - name: macOS Arm64
+            runner: macos-14
+            cmake_arch: ""
+            artifact: kond-macos-arm64
+            test: true
+          - name: Linux x86_64
+            runner: ubuntu-24.04
+            cmake_arch: ""
+            artifact: kond-linux-x86_64
+            test: true
+          - name: Linux Arm64
+            runner: ubuntu-24.04-arm
+            cmake_arch: ""
+            artifact: kond-linux-arm64
+            test: true
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Install toolchain
+      - name: Configure
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y \
-            build-essential \
-            clang \
-            llvm
+          if [ -n "${{ matrix.cmake_arch }}" ]; then
+            cmake -S . -B build -A "${{ matrix.cmake_arch }}" -DCMAKE_BUILD_TYPE=Release -DKOND_ENABLE_LLVM_JIT=OFF
+          else
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DKOND_ENABLE_LLVM_JIT=OFF
+          fi
 
-      - name: Clean previous build artifacts
-        run: make clean
+      - name: Build
+        run: cmake --build build --config Release --parallel 2
 
-      - name: Build and test
-        env:
-          CXX: ${{ matrix.cxx }}
-        run: make test
+      - name: Test
+        if: matrix.test
+        shell: bash
+        run: ./tests/run.sh ./build/kond
 
-  cmake:
-    name: CMake
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ runner.os == 'Windows' && 'build/Release/kond.exe' || 'build/kond' }}
+
+  cross-build:
+    name: Linux ${{ matrix.name }} cross-build
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: RISC-V 64
+            triple: riscv64-linux-gnu
+            artifact: kond-linux-riscv64
+          - name: PowerPC 64 LE
+            triple: powerpc64le-linux-gnu
+            artifact: kond-linux-ppc64le
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Install toolchain
+      - name: Install cross toolchain
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            build-essential \
             cmake \
             ninja-build \
-            llvm
+            g++-${{ matrix.triple }}
 
       - name: Configure
         run: >-
           cmake -S . -B build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DKOND_ENABLE_LLVM_JIT=ON
+          -DCMAKE_SYSTEM_NAME=Linux
+          -DCMAKE_C_COMPILER=${{ matrix.triple }}-gcc
+          -DCMAKE_CXX_COMPILER=${{ matrix.triple }}-g++
+          -DKOND_ENABLE_LLVM_JIT=OFF
 
       - name: Build
         run: cmake --build build --parallel 2
 
-      - name: Test
-        run: ./tests/run.sh ./build/kond
+      - name: Verify target architecture
+        run: file build/kond
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: build/kond
 
   deploy:
     name: Deploy to GitHub Pages
-    needs: [make, cmake]
+    needs: [native-build, cross-build]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04
     permissions:

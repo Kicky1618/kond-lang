@@ -1,17 +1,18 @@
 #include "kond_registry.hpp"
 
 #include "kond_http.hpp"
+#include "kond_socket.hpp"
 
-#include <arpa/inet.h>
-#include <cerrno>
 #include <fstream>
 #include <iterator>
-#include <netdb.h>
-#include <netinet/in.h>
+#ifndef _WIN32
+#  include <arpa/inet.h>
+#  include <netdb.h>
+#  include <netinet/in.h>
+#else
+#  include <ws2tcpip.h>
+#endif
 #include <set>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 namespace kond {
 namespace {
@@ -386,7 +387,8 @@ std::string buildBundle(const PackageManifest &manifest) {
     return output.str();
 }
 
-int connectRegistry(const RegistryAddress &address) {
+Socket connectRegistry(const RegistryAddress &address) {
+    ensureSocketsInitialized();
     struct addrinfo hints {};
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
@@ -395,20 +397,20 @@ int connectRegistry(const RegistryAddress &address) {
     if (::getaddrinfo(address.host.c_str(), service.c_str(), &hints, &addresses) != 0 || !addresses) {
         registryError("registry hostを解決できません: " + address.host);
     }
-    int client = -1;
+    Socket client = kInvalidSocket;
     for (struct addrinfo *entry = addresses; entry != nullptr; entry = entry->ai_next) {
         client = ::socket(entry->ai_family, entry->ai_socktype, entry->ai_protocol);
-        if (client < 0) continue;
+        if (client == kInvalidSocket) continue;
         if (::connect(client, entry->ai_addr, entry->ai_addrlen) == 0) break;
-        ::close(client);
-        client = -1;
+        closeSocket(client);
+        client = kInvalidSocket;
     }
     ::freeaddrinfo(addresses);
-    if (client < 0) registryError("registryへ接続できません: " + address.host + ":" + std::to_string(address.port));
+    if (client == kInvalidSocket) registryError("registryへ接続できません: " + address.host + ":" + std::to_string(address.port));
     return client;
 }
 
-void sendAll(int socket, const std::string &data) {
+void sendAll(Socket socket, const std::string &data) {
     std::size_t sent = 0;
     while (sent < data.size()) {
 #ifdef MSG_NOSIGNAL
@@ -416,9 +418,12 @@ void sendAll(int socket, const std::string &data) {
 #else
         constexpr int flags = 0;
 #endif
-        const ssize_t result = ::send(socket, data.data() + sent, data.size() - sent, flags);
+        const auto result = socketSend(socket, data.data() + sent,
+                                       std::min<std::size_t>(data.size() - sent,
+                                                            static_cast<std::size_t>(std::numeric_limits<int>::max())),
+                                       flags);
         if (result < 0) {
-            if (errno == EINTR) continue;
+            if (socketInterrupted()) continue;
             registryError("registryへのリクエスト送信に失敗しました");
         }
         if (result == 0) registryError("registryへのリクエスト送信が中断されました");
@@ -443,7 +448,7 @@ RegistryResponse parseRegistryResponse(const std::string &raw) {
 
 RegistryResponse registryRequest(const RegistryAddress &address, const std::string &method,
                                  const std::string &path, const std::string &body) {
-    const int client = connectRegistry(address);
+    const Socket client = connectRegistry(address);
     std::ostringstream request;
     request << method << ' ' << path << " HTTP/1.1\r\n"
             << "Host: " << address.host << "\r\n"
@@ -453,27 +458,27 @@ RegistryResponse registryRequest(const RegistryAddress &address, const std::stri
     try {
         sendAll(client, request.str());
     } catch (...) {
-        ::close(client);
+        closeSocket(client);
         throw;
     }
     std::string raw;
     char buffer[8192];
     while (true) {
-        const ssize_t received = ::recv(client, buffer, sizeof(buffer), 0);
+        const auto received = socketReceive(client, buffer, sizeof(buffer));
         if (received == 0) break;
         if (received < 0) {
-            if (errno == EINTR) continue;
-            ::close(client);
+            if (socketInterrupted()) continue;
+            closeSocket(client);
             registryError("registryの応答を読み取れません");
         }
         raw.append(buffer, static_cast<std::size_t>(received));
         if (raw.size() > 64 * 1024 * 1024) {
-            ::close(client);
+            closeSocket(client);
             registryError("registryの応答が大きすぎます");
         }
     }
-    ::shutdown(client, SHUT_RDWR);
-    ::close(client);
+    shutdownSocket(client);
+    closeSocket(client);
     return parseRegistryResponse(raw);
 }
 
@@ -579,7 +584,7 @@ private:
 
     void writeFile(const fs::path &path, const std::string &contents) const {
         const fs::path temporary = path.parent_path() /
-                                   ("." + path.filename().string() + ".tmp." + std::to_string(::getpid()));
+                                   ("." + path.filename().string() + ".tmp." + std::to_string(processId()));
         std::ofstream output(temporary, std::ios::out | std::ios::trunc);
         if (!output) throw std::runtime_error("cannot write registry bundle");
         output << contents;

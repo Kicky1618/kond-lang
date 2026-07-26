@@ -26,9 +26,17 @@ add_executable(kond
     src/kond_jit.hpp
     src/kond_http.hpp
     src/kond_registry.hpp
+    src/kond_socket.hpp
 )
 target_compile_features(kond PRIVATE cxx_std_17)
-target_compile_options(kond PRIVATE -Wall -Wextra -Wpedantic)
+if(MSVC)
+    target_compile_options(kond PRIVATE /W4)
+else()
+    target_compile_options(kond PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+if(WIN32)
+    target_link_libraries(kond PRIVATE ws2_32)
+endif()
 if(CMAKE_DL_LIBS)
     target_link_libraries(kond PRIVATE ${CMAKE_DL_LIBS})
 endif()

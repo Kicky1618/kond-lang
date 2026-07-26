@@ -1,12 +1,13 @@
 #include "kond_http.hpp"
+#include "kond_socket.hpp"
 
-#include <arpa/inet.h>
-#include <cerrno>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
+#ifndef _WIN32
+#  include <arpa/inet.h>
+#  include <netdb.h>
+#  include <netinet/in.h>
+#else
+#  include <ws2tcpip.h>
+#endif
 
 namespace kond {
 
@@ -119,10 +120,10 @@ static HttpRequestData readHttpRequest(int client, std::size_t maxBodyBytes) {
     while ((headerEnd = input.find("\r\n\r\n")) == std::string::npos) {
         if (input.size() >= maxHeaderBytes) httpParseFail(431, "HTTPヘッダーが大きすぎます");
         char buffer[4096];
-        const ssize_t received = ::recv(client, buffer, sizeof(buffer), 0);
+        const auto received = socketReceive(client, buffer, sizeof(buffer));
         if (received == 0) httpParseFail(400, "HTTPリクエストが途中で終了しました");
         if (received < 0) {
-            if (errno == EINTR) continue;
+            if (socketInterrupted()) continue;
             httpParseFail(400, "HTTPリクエストを読み取れません");
         }
         input.append(buffer, static_cast<std::size_t>(received));
@@ -189,10 +190,10 @@ static HttpRequestData readHttpRequest(int client, std::size_t maxBodyBytes) {
     while (body.size() < contentLength) {
         char buffer[4096];
         const std::size_t remaining = contentLength - body.size();
-        const ssize_t received = ::recv(client, buffer, std::min<std::size_t>(sizeof(buffer), remaining), 0);
+        const auto received = socketReceive(client, buffer, static_cast<int>(std::min<std::size_t>(sizeof(buffer), remaining)));
         if (received == 0) httpParseFail(400, "HTTPリクエストボディが途中で終了しました");
         if (received < 0) {
-            if (errno == EINTR) continue;
+            if (socketInterrupted()) continue;
             httpParseFail(400, "HTTPリクエストボディを読み取れません");
         }
         body.append(buffer, static_cast<std::size_t>(received));
@@ -270,9 +271,12 @@ static bool sendHttpBytes(int client, std::string_view data) {
 #else
         constexpr int sendFlags = 0;
 #endif
-        const ssize_t result = ::send(client, data.data() + sent, data.size() - sent, sendFlags);
+        const auto result = socketSend(client, data.data() + sent,
+                                       std::min<std::size_t>(data.size() - sent,
+                                                            static_cast<std::size_t>(std::numeric_limits<int>::max())),
+                                       sendFlags);
         if (result < 0) {
-            if (errno == EINTR) continue;
+            if (socketInterrupted()) continue;
             return false;
         }
         if (result == 0) return false;
@@ -297,8 +301,9 @@ static bool writeHttpResponse(int client, const HttpResponse &response, bool hea
     return headRequest || response.body.empty() || sendHttpBytes(client, response.body);
 }
 
-static int createHttpListener(const std::string &bindAddress, std::uint16_t port,
-                              std::uint16_t &actualPort) {
+static Socket createHttpListener(const std::string &bindAddress, std::uint16_t port,
+                                 std::uint16_t &actualPort) {
+    ensureSocketsInitialized();
     std::string host = bindAddress == "localhost" ? "127.0.0.1" : bindAddress;
     struct addrinfo hints {};
     hints.ai_family = AF_INET;
@@ -311,23 +316,24 @@ static int createHttpListener(const std::string &bindAddress, std::uint16_t port
         throw std::runtime_error("bind先を解決できません: " + bindAddress);
     }
 
-    int server = -1;
+    Socket server = kInvalidSocket;
     for (struct addrinfo *address = addresses; address != nullptr; address = address->ai_next) {
         server = ::socket(address->ai_family, address->ai_socktype, address->ai_protocol);
-        if (server < 0) continue;
+        if (server == kInvalidSocket) continue;
         int reuse = 1;
-        ::setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+        ::setsockopt(server, SOL_SOCKET, SO_REUSEADDR,
+                     reinterpret_cast<const char *>(&reuse), sizeof(reuse));
         if (::bind(server, address->ai_addr, address->ai_addrlen) == 0 && ::listen(server, 64) == 0) break;
-        ::close(server);
-        server = -1;
+        closeSocket(server);
+        server = kInvalidSocket;
     }
     ::freeaddrinfo(addresses);
-    if (server < 0) throw std::runtime_error("HTTPサーバーをbind/listenできません");
+    if (server == kInvalidSocket) throw std::runtime_error("HTTPサーバーをbind/listenできません");
 
     struct sockaddr_in bound {};
-    socklen_t boundLength = sizeof(bound);
+    SocketLength boundLength = sizeof(bound);
     if (::getsockname(server, reinterpret_cast<struct sockaddr *>(&bound), &boundLength) != 0) {
-        ::close(server);
+        closeSocket(server);
         throw std::runtime_error("HTTPサーバーのポートを取得できません");
     }
     actualPort = ntohs(bound.sin_port);
@@ -354,13 +360,13 @@ void runHttpServer(const std::string &bindAddress, std::uint16_t port,
                    std::size_t maxBodyBytes, bool once,
                    const HttpRequestHandler &handler) {
     std::uint16_t actualPort = 0;
-    const int server = createHttpListener(bindAddress, port, actualPort);
+    const Socket server = createHttpListener(bindAddress, port, actualPort);
     std::cerr << "kond: listening on http://" << bindAddress << ':' << actualPort << '\n';
     while (true) {
-        const int client = ::accept(server, nullptr, nullptr);
-        if (client < 0) {
-            if (errno == EINTR) continue;
-            ::close(server);
+        const Socket client = ::accept(server, nullptr, nullptr);
+        if (client == kInvalidSocket) {
+            if (socketInterrupted()) continue;
+            closeSocket(server);
             throw std::runtime_error("HTTP接続を受け付けられません");
         }
         HttpResponse response;
@@ -375,14 +381,14 @@ void runHttpServer(const std::string &bindAddress, std::uint16_t port,
             response = genericHttpResponse(500, "Internal Server Error\n");
         }
         writeHttpResponse(client, response, headRequest);
-        ::shutdown(client, SHUT_RDWR);
-        ::close(client);
+        shutdownSocket(client);
+        closeSocket(client);
         if (once) break;
     }
-    ::close(server);
+    closeSocket(server);
 }
 
-int HttpServer::createListener() {
+Socket HttpServer::createListener() {
     return createHttpListener(bindAddress_, port_, actualPort_);
 }
 

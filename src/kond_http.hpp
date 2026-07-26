@@ -1,6 +1,7 @@
 #pragma once
 
 #include "kond_interpreter_api.hpp"
+#include "kond_socket.hpp"
 
 namespace kond {
 
@@ -27,7 +28,7 @@ private:
     std::size_t maxBodyBytes_ = 1024 * 1024;
     bool once_ = false;
 
-    int createListener();
+    Socket createListener();
 };
 
 } // namespace kond

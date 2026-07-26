@@ -246,9 +246,6 @@ input {
 }
 
 .prose-kond code {
-  background: rgba(200, 255, 112, 0.1);
-  border: 1px solid rgba(200, 255, 112, 0.14);
-  border-radius: 0.3rem;
   color: var(--lime);
   font-family: var(--font-mono);
   font-size: 0.86em;
